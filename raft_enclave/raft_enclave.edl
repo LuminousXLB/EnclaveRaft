@@ -1,0 +1,12 @@
+enclave {
+    from "sgx_tae_service.edl" import *;
+
+    trusted {
+        public uint64_t get_secret();
+    };
+
+    untrusted {
+        void ocall_puts([in, string]const char* str);
+        uint64_t get_time();
+    };
+};
