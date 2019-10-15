@@ -89,6 +89,8 @@
 #include "async_task/timer_task.hxx"
 #include "async_task/delayed_task_scheduler_interface.hxx"
 
+#include "raft_exception.hxx"
+
 //#include "asio_service.hxx"
 //#include "fs_log_store.hxx"
 #endif // _CORNERSTONE_HXX_

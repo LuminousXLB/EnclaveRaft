@@ -97,11 +97,12 @@ ptr<resp_msg> raft_server::handle_append_entries(req_msg &req) {
         if (role_ == srv_role::candidate) {
             become_follower();
         } else if (role_ == srv_role::leader) {
-            l_->debug(
-                    lstrfmt("Receive AppendEntriesRequest from another leader(%d) with same term, there must be a bug, server exits")
-                            .fmt(req.get_src()));
+            std::string err = lstrfmt(
+                    "Receive AppendEntriesRequest from another leader(%d) with same term, there must be a bug, server exits").fmt(
+                    req.get_src());
+            l_->debug(err);
             ctx_->state_mgr_->system_exit(-1);
-            ::exit(-1);
+            throw raft_exception(err);
         } else {
             restart_election_timer();
         }
@@ -236,10 +237,9 @@ void raft_server::handle_election_timeout() {
     recur_lock(lock_);
     if (steps_to_down_ > 0) {
         if (--steps_to_down_ == 0) {
-            l_->info("no hearing further news from leader, remove this server from cluster and step down");
-            for (std::list<ptr<srv_config>>::iterator it = config_->get_servers().begin();
-                 it != config_->get_servers().end();
-                 ++it) {
+            auto info = "no hearing further news from leader, remove this server from cluster and step down";
+            l_->info(info);
+            for (auto it = config_->get_servers().begin(); it != config_->get_servers().end(); ++it) {
                 if ((*it)->get_id() == id_) {
                     config_->get_servers().erase(it);
                     ctx_->state_mgr_->save_config(*config_);
@@ -248,8 +248,8 @@ void raft_server::handle_election_timeout() {
             }
 
             ctx_->state_mgr_->system_exit(-1);
-            ::exit(0);
-            return;
+
+            throw raft_exception(info);
         }
 
         l_->info(sstrfmt("stepping down (cycles left: %d), skip this election timeout event").fmt(steps_to_down_));
@@ -265,10 +265,10 @@ void raft_server::handle_election_timeout() {
     }
 
     if (role_ == srv_role::leader) {
-        l_->err("A leader should never encounter election timeout, illegal application state, stop the application");
+        auto err = "A leader should never encounter election timeout, illegal application state, stop the application";
+        l_->err(err);
         ctx_->state_mgr_->system_exit(-1);
-        ::exit(-1);
-        return;
+        throw raft_exception(err);
     }
 
     l_->debug("Election timeout, change to Candidate");
@@ -368,11 +368,11 @@ void raft_server::handle_peer_resp(ptr<resp_msg> &resp, const ptr<rpc_exception>
             handle_install_snapshot_resp(*resp);
             break;
         default:
-            l_->err(sstrfmt("Received an unexpected message %s for response, system exits.").fmt(
-                    __msg_type_str[resp->get_type()]));
+            auto err_string = sstrfmt("Received an unexpected message %s for response, system exits.").fmt(
+                    __msg_type_str[resp->get_type()]);
+            l_->err(err_string);
             ctx_->state_mgr_->system_exit(-1);
-            ::exit(-1);
-            break;
+            throw raft_exception(err_string);
     }
 }
 
@@ -644,18 +644,18 @@ void raft_server::snapshot_and_compact(ulong committed_idx) {
                 conf->get_prev_log_idx() > 0 &&
                 conf->get_prev_log_idx() < log_store_->start_index()) {
                 if (!last_snapshot_) {
-                    l_->err("No snapshot could be found while no configuration cannot be found in current committed logs, this is a system error, exiting");
+                    auto err_string = "No snapshot could be found while no configuration cannot be found in current committed logs, this is a system error, exiting";
+                    l_->err(err_string);
                     ctx_->state_mgr_->system_exit(-1);
-                    ::exit(-1);
-                    return;
+                    throw raft_exception(err_string);
                 }
 
                 conf = last_snapshot_->get_last_config();
             } else if (conf->get_log_idx() > committed_idx && conf->get_prev_log_idx() == 0) {
-                l_->err("BUG!!! stop the system, there must be a configuration at index one");
+                auto err_string = "BUG!!! stop the system, there must be a configuration at index one";
+                l_->err(err_string);
                 ctx_->state_mgr_->system_exit(-1);
-                ::exit(-1);
-                return;
+                throw raft_exception(err_string);
             }
 
             ulong log_term_to_compact = log_store_->term_at(committed_idx);
@@ -728,10 +728,11 @@ ptr<req_msg> raft_server::create_append_entries_req(peer &p) {
     }
 
     if (last_log_idx >= cur_nxt_idx) {
-        l_->err(sstrfmt("Peer's lastLogIndex is too large %llu v.s. %llu, server exits").fmt(last_log_idx,
-                                                                                             cur_nxt_idx));
+        auto err_string = sstrfmt("Peer's lastLogIndex is too large %llu v.s. %llu, server exits").fmt(last_log_idx,
+                                                                                                       cur_nxt_idx);
+        l_->err(err_string);
         ctx_->state_mgr_->system_exit(-1);
-        ::exit(-1);
+        throw raft_exception(err_string);
         return ptr<req_msg>();
     }
 
@@ -848,11 +849,11 @@ ptr<resp_msg> raft_server::handle_extended_msg(req_msg &req) {
         case msg_type::install_snapshot_request:
             return handle_install_snapshot_req(req);
         default:
-            l_->err(sstrfmt("receive an unknown request %s, for safety, step down.").fmt(
-                    __msg_type_str[req.get_type()]));
+            auto err_string = sstrfmt("receive an unknown request %s, for safety, step down.").fmt(
+                    __msg_type_str[req.get_type()]);
+            l_->err(err_string);
             ctx_->state_mgr_->system_exit(-1);
-            ::exit(-1);
-            break;
+            throw raft_exception(err_string);
     }
 
     return ptr<resp_msg>();
@@ -863,12 +864,12 @@ ptr<resp_msg> raft_server::handle_install_snapshot_req(req_msg &req) {
         if (role_ == srv_role::candidate) {
             become_follower();
         } else if (role_ == srv_role::leader) {
-            l_->err(lstrfmt(
+            auto err_string = lstrfmt(
                     "Receive InstallSnapshotRequest from another leader(%d) with same term, there must be a bug, server exits").fmt(
-                    req.get_src()));
+                    req.get_src());
+            l_->err(err_string);
             ctx_->state_mgr_->system_exit(-1);
-            ::exit(-1);
-            return ptr<resp_msg>();
+            throw raft_exception(err_string);
         } else {
             restart_election_timer();
         }
@@ -906,9 +907,10 @@ bool raft_server::handle_snapshot_sync_req(snapshot_sync_req &req) {
         if (req.is_done()) {
             // Only follower will run this piece of code, but let's check it again
             if (role_ != srv_role::follower) {
-                l_->err("bad server role for applying a snapshot, exit for debugging");
+                auto err_string = "bad server role for applying a snapshot, exit for debugging";
+                l_->err(err_string);
                 ctx_->state_mgr_->system_exit(-1);
-                ::exit(-1);
+                throw raft_exception(err_string);
             }
 
             l_->debug("sucessfully receive a snapshot from leader");
@@ -918,11 +920,10 @@ bool raft_server::handle_snapshot_sync_req(snapshot_sync_req &req) {
                 stop_election_timer();
                 l_->info("successfully compact the log store, will now ask the statemachine to apply the snapshot");
                 if (!state_machine_->apply_snapshot(req.get_snapshot())) {
-                    l_->info(
-                            "failed to apply the snapshot after log compacted, to ensure the safety, will shutdown the system");
+                    auto info_string = "failed to apply the snapshot after log compacted, to ensure the safety, will shutdown the system";
+                    l_->info(info_string);
                     ctx_->state_mgr_->system_exit(-1);
-                    ::exit(-1);
-                    return false;
+                    throw raft_exception(info_string);
                 }
 
                 reconfigure(req.get_snapshot().get_last_config());
@@ -944,10 +945,10 @@ bool raft_server::handle_snapshot_sync_req(snapshot_sync_req &req) {
         }
     }
     catch (...) {
-        l_->err("failed to handle snapshot installation due to system errors");
+        auto err_string = "failed to handle snapshot installation due to system errors";
+        l_->err(err_string);
         ctx_->state_mgr_->system_exit(-1);
-        ::exit(-1);
-        return false;
+        throw raft_exception(err_string);
     }
 
     return true;
@@ -1013,10 +1014,10 @@ void raft_server::handle_ext_resp(ptr<resp_msg> &resp, const ptr<rpc_exception> 
 
             ptr<snapshot_sync_ctx> sync_ctx = srv_to_join_->get_snapshot_sync_ctx();
             if (sync_ctx == nilptr) {
-                l_->err("Bug! SnapshotSyncContext must not be null");
+                auto err_string = "Bug! SnapshotSyncContext must not be null";
+                l_->err(err_string);
                 ctx_->state_mgr_->system_exit(-1);
-                ::exit(-1);
-                return;
+                throw raft_exception(err_string);
             }
 
             if (resp->get_next_idx() >= sync_ctx->get_snapshot()->size()) {
@@ -1035,11 +1036,11 @@ void raft_server::handle_ext_resp(ptr<resp_msg> &resp, const ptr<rpc_exception> 
         }
             break;
         default:
-            l_->err(lstrfmt("received an unexpected response message type %s, for safety, stepping down").fmt(
-                    __msg_type_str[resp->get_type()]));
+            auto err_string = lstrfmt("received an unexpected response message type %s, for safety, stepping down").fmt(
+                    __msg_type_str[resp->get_type()]);
+            l_->err(err_string);
             ctx_->state_mgr_->system_exit(-1);
-            ::exit(-1);
-            break;
+            throw raft_exception(err_string);
     }
 }
 
@@ -1316,19 +1317,19 @@ ptr<req_msg> raft_server::create_sync_snapshot_req(peer &p, ulong last_log_idx, 
     if (!snp || (last_snapshot_ && last_snapshot_->get_last_log_idx() > snp->get_last_log_idx())) {
         snp = last_snapshot_;
         if (snp == nilptr || last_log_idx > snp->get_last_log_idx()) {
-            l_->err(
-                    lstrfmt("system is running into fatal errors, failed to find a snapshot for peer %d(snapshot null: %d, snapshot doesn't contais lastLogIndex: %d")
-                            .fmt(p.get_id(), snp == nilptr ? 1 : 0, last_log_idx > snp->get_last_log_idx() ? 1 : 0));
+            auto err_string = lstrfmt(
+                    "system is running into fatal errors, failed to find a snapshot for peer %d(snapshot null: %d, snapshot doesn't contais lastLogIndex: %d")
+                    .fmt(p.get_id(), snp == nilptr ? 1 : 0, last_log_idx > snp->get_last_log_idx() ? 1 : 0);
+            l_->err(err_string);
             ctx_->state_mgr_->system_exit(-1);
-            ::exit(-1);
-            return ptr<req_msg>();
+            throw raft_exception(err_string);
         }
 
         if (snp->size() < 1L) {
-            l_->err("invalid snapshot, this usually means a bug from state machine implementation, stop the system to prevent further errors");
+            auto err_string = "invalid snapshot, this usually means a bug from state machine implementation, stop the system to prevent further errors";
+            l_->err(err_string);
             ctx_->state_mgr_->system_exit(-1);
-            ::exit(-1);
-            return ptr<req_msg>();
+            throw raft_exception(err_string);
         }
 
         l_->info(sstrfmt("trying to sync snapshot with last index %llu to peer %d").fmt(snp->get_last_log_idx(),
@@ -1337,17 +1338,17 @@ ptr<req_msg> raft_server::create_sync_snapshot_req(peer &p, ulong last_log_idx, 
     }
 
     ulong offset = p.get_snapshot_sync_ctx()->get_offset();
-    int32 sz_left = (int32) (snp->size() - offset);
+    auto sz_left = (int32) (snp->size() - offset);
     int32 blk_sz = get_snapshot_sync_block_size();
     bufptr data = buffer::alloc((size_t) (std::min(blk_sz, sz_left)));
     int32 sz_rd = state_machine_->read_snapshot_data(*snp, offset, *data);
     if ((size_t) sz_rd < data->size()) {
-        l_->err(lstrfmt(
+        auto err_string = lstrfmt(
                 "only %d bytes could be read from snapshot while %d bytes are expected, must be something wrong, exit.").fmt(
-                sz_rd, data->size()));
+                sz_rd, data->size());
+        l_->err(err_string);
         ctx_->state_mgr_->system_exit(-1);
-        ::exit(-1);
-        return ptr<req_msg>();
+        throw raft_exception(err_string);
     }
 
     bool done = (offset + (ulong) data->size()) >= snp->size();
@@ -1370,10 +1371,12 @@ ulong raft_server::term_for_log(ulong log_idx) {
 
     ptr<snapshot> last_snapshot(state_machine_->last_snapshot());
     if (!last_snapshot || log_idx != last_snapshot->get_last_log_idx()) {
-        l_->err(sstrfmt("bad log_idx %llu for retrieving the term value, kill the system to protect the system").fmt(
-                log_idx));
+        auto err_string = sstrfmt(
+                "bad log_idx %llu for retrieving the term value, kill the system to protect the system").fmt(
+                log_idx);
+        l_->err(err_string);
         ctx_->state_mgr_->system_exit(-1);
-        ::exit(-1);
+        throw raft_exception(err_string);
     }
 
     return last_snapshot->get_last_log_term();
@@ -1423,10 +1426,12 @@ void raft_server::commit_in_bg() {
             }
         }
         catch (std::exception &err) {
-            l_->err(lstrfmt("background committing thread encounter err %s, exiting to protect the system").fmt(
-                    err.what()));
+            auto err_string = lstrfmt(
+                    "background committing thread encounter err %s, exiting to protect the system").fmt(
+                    err.what());
+            l_->err(err_string);
             ctx_->state_mgr_->system_exit(-1);
-            ::exit(-1);
+            throw raft_exception(err_string);
         }
     }
 }
