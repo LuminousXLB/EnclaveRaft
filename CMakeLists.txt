@@ -14,11 +14,13 @@ add_subdirectory(raft_app/sgx_utils)
 include_directories(raft_app/sgx_utils)
 
 #######################################################################################################################
+file(GLOB CORNERSTONE_SRCS raft_enclave/raft/src/*.cxx)
+
 set(EDL_SEARCH_PATHS raft_enclave)
 
 # build enclave library
 add_enclave_library(Enclave_raft
-        SRCS raft_enclave/raft_enclave.cpp
+        SRCS raft_enclave/raft_enclave.cpp ${CORNERSTONE_SRCS}
         EDL raft_enclave/raft_enclave.edl
         EDL_SEARCH_PATHS raft_enclave)
 
@@ -30,6 +32,8 @@ target_include_directories(Enclave_raft PRIVATE ${SGXSSL_INCLUDE_DIR})
 enclave_sign(Enclave_raft
         KEY raft_enclave/raft_enclave_private.pem
         CONFIG raft_enclave/raft_enclave.config.xml)
+
+#######################################################################################################################
 
 # build untrusted executable to run with enclave
 add_untrusted_executable(App_raft

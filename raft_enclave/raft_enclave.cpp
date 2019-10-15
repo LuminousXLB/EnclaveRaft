@@ -29,3 +29,19 @@ uint64_t get_secret() {
 
     return timestamp;
 }
+
+class RPC_Request {
+    // properties
+    //   meta data
+    //   rpc type
+
+    // methods
+    //   serialize(to bytes)
+    //   deserialize(from bytes)
+};
+
+sgx_status_t ecall_raft_rpc_handle_request(char *base64_request) {
+    // decode
+    // decrypt
+    // dispatch
+}
