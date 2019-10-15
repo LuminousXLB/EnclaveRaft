@@ -18,6 +18,8 @@
 #ifndef _CONTEXT_HXX_
 #define _CONTEXT_HXX_
 
+#include <utility>
+
 #include "state_mgr_interface.hxx"
 #include "rpc/rpc_listener_interface.hxx"
 #include "rpc/rpc_client_factory_interface.hxx"
@@ -28,20 +30,22 @@
 namespace cornerstone {
     struct context {
     public:
-        context(
-                ptr<state_mgr> &mgr,
+        context(ptr<state_mgr> &mgr,
                 ptr<state_machine> &m,
                 ptr<rpc_listener> &listener,
                 ptr<logger> &l,
                 ptr<rpc_client_factory> &cli_factory,
                 ptr<delayed_task_scheduler> &scheduler,
-                raft_params *params = nilptr)
+                std::function<time_point()> get_time_function,
+                raft_params *params = nilptr
+        )
                 : state_mgr_(mgr),
                   state_machine_(m),
                   rpc_listener_(listener),
                   logger_(l),
                   rpc_cli_factory_(cli_factory),
                   scheduler_(scheduler),
+                  get_time_(std::move(get_time_function)),
                   params_(params == nilptr ? new raft_params : params) {}
 
     __nocopy__(context)
@@ -54,6 +58,7 @@ namespace cornerstone {
         ptr<rpc_client_factory> rpc_cli_factory_;
         ptr<delayed_task_scheduler> scheduler_;
         std::unique_ptr<raft_params> params_;
+        std::function<time_point()> get_time_;
     };
 }
 

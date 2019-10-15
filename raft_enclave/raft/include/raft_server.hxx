@@ -63,7 +63,8 @@ namespace cornerstone {
                   ex_resp_handler_((rpc_handler) std::bind(&raft_server::handle_ext_resp, this, std::placeholders::_1,
                                                            std::placeholders::_2)),
                   last_snapshot_(ctx->state_machine_->last_snapshot()),
-                  voted_servers_() {
+                  voted_servers_(),
+                  get_time_(ctx->get_time_) {
 
 //            uint seed = (uint) (std::chrono::system_clock::now().time_since_epoch().count() * id_);
 //            std::default_random_engine engine(seed);
@@ -279,6 +280,7 @@ namespace cornerstone {
         rpc_handler ex_resp_handler_;
         ptr<snapshot> last_snapshot_;
         std::unordered_set<int32> voted_servers_;
+        std::function<time_point()> get_time_;
     };
 }
 #endif //_RAFT_SERVER_HXX_

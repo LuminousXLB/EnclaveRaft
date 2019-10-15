@@ -14,20 +14,12 @@ void printf(const char *fmt, ...) {
     ocall_puts(buf);
 }
 
-sgx_status_t sgx_get_trusted_time_hook(sgx_time_t *current_time, sgx_time_source_nonce_t *time_source_nounce) {
-    // sgx_create_pse_session();
-    sgx_status_t status = get_time(current_time);
-    // sgx_close_pse_session();
-    return status;
-}
-
 uint64_t get_secret() {
-    sgx_time_t timestamp;
-    sgx_time_source_nonce_t nonce;
+    int64_t current_time;
 
-    sgx_get_trusted_time_hook(&timestamp, &nonce);
+    sgx_status_t status = get_time_milliseconds(&current_time);
 
-    return timestamp;
+    return current_time;
 }
 
 class RPC_Request {

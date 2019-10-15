@@ -7,6 +7,6 @@ enclave {
 
     untrusted {
         void ocall_puts([in, string]const char* str);
-        uint64_t get_time();
+        int64_t get_time_milliseconds();
     };
 };
