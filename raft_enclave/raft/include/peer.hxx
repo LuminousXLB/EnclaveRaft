@@ -25,7 +25,7 @@
 #include "rpc/rpc_exception.hxx"
 #include "rpc/req_msg.hxx"
 #include "rpc/resp_msg.hxx"
-#include "rpc/rpc_client_interfice.hxx"
+#include "rpc/rpc_client_interface.hxx"
 
 namespace cornerstone {
     class peer {

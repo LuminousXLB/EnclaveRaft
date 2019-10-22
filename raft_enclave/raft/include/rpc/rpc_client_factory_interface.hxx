@@ -18,7 +18,7 @@
 #ifndef _RPC_CLIENT_FACTORY_HXX_
 #define _RPC_CLIENT_FACTORY_HXX_
 
-#include "rpc_client_interfice.hxx"
+#include "rpc_client_interface.hxx"
 
 namespace cornerstone {
     class rpc_client_factory {

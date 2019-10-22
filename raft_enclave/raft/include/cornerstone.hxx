@@ -82,7 +82,7 @@
 #include "rpc/async_result.hxx"
 #include "rpc/rpc_exception.hxx"
 #include "rpc/rpc_listener_interface.hxx"
-#include "rpc/rpc_client_interfice.hxx"
+#include "rpc/rpc_client_interface.hxx"
 #include "rpc/rpc_client_factory_interface.hxx"
 
 #include "async_task/delayed_task.hxx"

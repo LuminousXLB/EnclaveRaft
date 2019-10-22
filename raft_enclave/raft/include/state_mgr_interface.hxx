@@ -38,7 +38,7 @@ namespace cornerstone {
 
         virtual int32 server_id() = 0;
 
-        virtual void system_exit(const int exit_code) = 0;
+        virtual void system_exit(int exit_code) = 0;
     };
 }
 

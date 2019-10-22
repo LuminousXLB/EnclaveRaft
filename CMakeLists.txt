@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(SGX_enclave_to_enclave_ra)
+project(EnclaveRaft)
 
 set(CMAKE_CXX_STANDARD 11)
 
