@@ -22,7 +22,7 @@ include_directories(common)
 
 #######################################################################################################################
 file(GLOB T_CORNERSTONE_SRCS raft_enclave/raft/src/*.cxx)
-file(GLOB T_RAFT_LOGSTORE_SRCS raft_enclave/log_store/*.cxx)
+file(GLOB T_RAFT_LOGSTORE_SRCS raft_enclave/app_impl/*.cxx)
 file(GLOB T_SGX_PORT_SRCS raft_enclave/port/*.cxx)
 
 set(EDL_SEARCH_PATHS raft_enclave)
