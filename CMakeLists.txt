@@ -21,17 +21,17 @@ include_directories(raft_app/sgx_utils)
 include_directories(common)
 
 #######################################################################################################################
-file(GLOB CORNERSTONE_SRCS raft_enclave/raft/src/*.cxx)
+file(GLOB T_CORNERSTONE_SRCS raft_enclave/raft/src/*.cxx)
+file(GLOB T_RAFT_LOGSTORE_SRCS raft_enclave/log_store/*.cxx)
 file(GLOB T_SGX_PORT_SRCS raft_enclave/port/*.cxx)
 
 set(EDL_SEARCH_PATHS raft_enclave)
 
 # build enclave library
 add_enclave_library(Enclave_raft
-        SRCS raft_enclave/raft_enclave.cpp ${CORNERSTONE_SRCS} ${T_SGX_PORT_SRCS}
+        SRCS raft_enclave/raft_enclave.cpp ${T_CORNERSTONE_SRCS} ${T_SGX_PORT_SRCS} ${T_RAFT_LOGSTORE_SRCS}
         EDL raft_enclave/raft_enclave.edl
         EDL_SEARCH_PATHS raft_enclave)
-
 target_include_directories(Enclave_raft PRIVATE ${SGXSSL_INCLUDE_DIR})
 #include_directories(raft_enclave)
 

@@ -63,7 +63,7 @@ namespace cornerstone {
             return ptr<srv_config>();
         }
 
-        bufptr serialize() {
+        bufptr serialize() const {
             size_t sz = 2 * sz_ulong + sz_int;
             std::vector<bufptr> srv_buffs;
             for (cluster_config::const_srv_itor it = servers_.begin(); it != servers_.end(); ++it) {

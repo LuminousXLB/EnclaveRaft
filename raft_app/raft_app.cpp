@@ -7,9 +7,6 @@
 sgx_enclave_id_t global_eid;
 
 /* OCall implementations */
-void ocall_puts(const char *str) {
-    printf("%s\n", str);
-}
 
 int64_t get_time_milliseconds() {
     timespec tp{};

@@ -21,8 +21,8 @@
 namespace cornerstone {
     class srv_state {
     public:
-        srv_state()
-                : term_(0L), voted_for_(-1) {}
+        explicit srv_state(ulong term = 0L, int voted_for = -1)
+                : term_(term), voted_for_(voted_for) {}
 
     __nocopy__(srv_state)
 
@@ -36,6 +36,20 @@ namespace cornerstone {
         void set_voted_for(int voted_for) { voted_for_ = voted_for; }
 
         void inc_term() { term_ += 1; }
+
+        bufptr serialize() const {
+            bufptr buf = buffer::alloc(sz_ulong + sz_int);
+            buf->put(term_);
+            buf->put(voted_for_);
+            buf->pos(0);
+            return buf;
+        }
+
+        static ptr <srv_state> deserialize(buffer &buf) {
+            ulong term = buf.get_ulong();
+            int voted_for = buf.get_int();
+            return cs_new<srv_state>(term, voted_for);
+        }
 
     private:
         ulong term_;
