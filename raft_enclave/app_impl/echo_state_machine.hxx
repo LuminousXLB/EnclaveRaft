@@ -23,50 +23,90 @@ limitations under the License.
 #include <mutex>
 
 using std::atomic;
+using std::lock_guard;
 using std::mutex;
+using std::string;
 
 using cornerstone::async_result;
 using cornerstone::buffer;
+using cornerstone::bufptr;
 using cornerstone::state_machine;
 using cornerstone::snapshot;
 using cornerstone::ptr;
+using cornerstone::strfmt;
 
 class echo_state_machine : public state_machine {
 public:
-    void commit(const ulong log_idx, buffer &data) override {
-        
+    void pre_commit(const ulong log_idx, buffer &data) override {
+        string put = strfmt<256>("PRE_COMMIT %ul %s").fmt(log_idx, data.get_str());
+        ocall_puts(put.c_str());
     }
 
-    void pre_commit(const ulong log_idx, buffer &data) override {
+    void commit(const ulong log_idx, buffer &data) override {
+        string put = strfmt<256>("COMMIT %ul %s").fmt(log_idx, data.get_str());
+        ocall_puts(put.c_str());
 
+        last_committed_idx_ = log_idx;
     }
 
     void rollback(const ulong log_idx, buffer &data) override {
-
+        string put = strfmt<256>("ROLLBACK %ul %s").fmt(log_idx, data.get_str());
+        ocall_puts(put.c_str());
     }
 
     void save_snapshot_data(snapshot &s, const ulong offset, buffer &data) override {
+//        TODO:
 
     }
 
     bool apply_snapshot(snapshot &s) override {
-        return false;
+        string put = strfmt<256>("APPLY_SNAPSHOT @log=%ul @term=%ul").fmt(
+                s.get_last_log_term(),
+                s.get_last_log_term()
+        );
+        ocall_puts(put.c_str());
+
+        // Clone snapshot from `s`.
+        {
+            lock_guard<mutex> lock(last_snapshot_lock_);
+            bufptr snp_buf = s.serialize();
+            last_snapshot_ = snapshot::deserialize(*snp_buf);
+        }
+
+        return true;
     }
 
     int read_snapshot_data(snapshot &s, const ulong offset, buffer &data) override {
+//        TODO:
         return 0;
     }
 
     ptr<snapshot> last_snapshot() override {
-        return ptr<snapshot>();
+        lock_guard<mutex> lock(last_snapshot_lock_);
+        return last_snapshot_;
     }
 
     ulong last_commit_index() override {
-        return 0;
+        return last_committed_idx_;
     }
 
     void create_snapshot(snapshot &s, async_result<bool>::handler_type &when_done) override {
+        string put = strfmt<256>("CREATE_SNAPSHOT @log=%ul @term=%ul").fmt(
+                s.get_last_log_term(),
+                s.get_last_log_term()
+        );
+        ocall_puts(put.c_str());
 
+        // Clone snapshot from `s`.
+        {
+            lock_guard<mutex> lock(last_snapshot_lock_);
+            bufptr snp_buf = s.serialize();
+            last_snapshot_ = snapshot::deserialize(*snp_buf);
+        }
+
+        ptr<std::exception> except(nullptr);
+        bool ret = true;
+        when_done(ret, except);
     }
 
 private:
@@ -74,7 +114,7 @@ private:
     atomic<uint64_t> last_committed_idx_;
 
     // Last snapshot.
-    ptr <snapshot> last_snapshot_;
+    ptr<snapshot> last_snapshot_;
 
     // Mutex for last snapshot.
     mutex last_snapshot_lock_;
