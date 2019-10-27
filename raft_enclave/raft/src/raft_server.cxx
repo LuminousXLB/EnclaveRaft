@@ -40,7 +40,8 @@ static const char *__msg_type_str[] = {
         "leave_cluster_request",
         "leave_cluster_response",
         "install_snapshot_request",
-        "install_snapshot_response"};
+        "install_snapshot_response"
+};
 
 ptr<resp_msg> raft_server::process_req(req_msg &req) {
     recur_lock(lock_);

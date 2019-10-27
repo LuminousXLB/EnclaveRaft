@@ -1,12 +1,14 @@
 enclave {
     from "sgx_tae_service.edl" import *;
+    include "log_level.hxx";
 
     trusted {
         public uint64_t get_secret();
     };
 
     untrusted {
-        void ocall_puts([in, string]const char* str);
+        void ocall_print_log(log_level level, const char *log);
+        // void ocall_puts([in, string]const char* str);
         int64_t get_time_milliseconds();
     };
 };

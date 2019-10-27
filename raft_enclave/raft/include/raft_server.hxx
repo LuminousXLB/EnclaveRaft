@@ -105,17 +105,21 @@ namespace cornerstone {
                 }
             }
 
-//            TODO: This part should be moved out of enclave
-//            std::list<ptr<srv_config>> &srvs(config_->get_servers());
-//            for (cluster_config::srv_itor it = srvs.begin(); it != srvs.end(); ++it) {
-//                if ((*it)->get_id() != id_) {
-//                    timer_task<peer &>::executor exec = (timer_task<peer &>::executor) std::bind(
-//                            &raft_server::handle_hb_timeout, this, std::placeholders::_1);
-//                    peers_.insert(std::make_pair((*it)->get_id(), cs_new<peer, ptr<srv_config> &, context &,
-//                            timer_task<peer &>::executor & >(*it, *ctx_, exec)));
-//                }
-//            }
-//
+            std::list<ptr<srv_config>> &srvs(config_->get_servers());
+            for (auto &srv : srvs) {
+                if (srv->get_id() != id_) {
+                    timer_task<peer &>::executor exec = (timer_task<peer &>::executor) std::bind(
+                            &raft_server::handle_hb_timeout,
+                            this,
+                            std::placeholders::_1
+                    );
+
+                    peers_.insert(std::make_pair(srv->get_id(), cs_new<peer, ptr<srv_config> &, context &,
+                            timer_task<peer &>::executor &>(srv, *ctx_, exec)));
+                }
+            }
+
+////            TODO: This part should be moved out of enclave
 //            std::thread commiting_thread = std::thread(std::bind(&raft_server::commit_in_bg, this));
 //            commiting_thread.detach();
 //            restart_election_timer();

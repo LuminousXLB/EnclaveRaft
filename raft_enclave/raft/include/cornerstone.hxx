@@ -52,7 +52,7 @@
 #include "utils/pp_util.hxx"
 #include "utils/strfmt.hxx"
 #include "utils/ptr.hxx"
-#include "utils/logger.hxx"
+#include "utils/logger_interface.hxx"
 #include "utils/buffer.hxx"
 
 #include "state_machine_interface.hxx"

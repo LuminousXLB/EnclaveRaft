@@ -1,0 +1,16 @@
+//
+// Created by ncl on 24/10/19.
+//
+
+#ifndef ENCLAVERAFT_LOG_LEVEL_HXX
+#define ENCLAVERAFT_LOG_LEVEL_HXX
+
+#define LOG_LEVEL_TRACE 0
+#define LOG_LEVEL_DEBUG 1
+#define LOG_LEVEL_INFO 2
+#define LOG_LEVEL_WARN 3
+#define LOG_LEVEL_ERROR 4
+#define LOG_LEVEL_CRITICAL 5
+#define LOG_LEVEL_OFF 6
+
+#endif //ENCLAVERAFT_LOG_LEVEL_HXX

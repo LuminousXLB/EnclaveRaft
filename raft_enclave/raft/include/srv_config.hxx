@@ -1,3 +1,5 @@
+#include <utility>
+
 /**
 *
 * Licensed to the Apache Software Foundation (ASF) under one
@@ -21,8 +23,8 @@
 namespace cornerstone {
     class srv_config {
     public:
-        srv_config(int32 id, const std::string &endpoint)
-                : id_(id), endpoint_(endpoint) {}
+        srv_config(int32 id, std::string endpoint)
+                : id_(id), endpoint_(std::move(endpoint)) {}
 
     __nocopy__(srv_config)
 
