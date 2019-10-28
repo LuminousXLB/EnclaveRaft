@@ -9,6 +9,6 @@ void ocall_puts(const char *str) {
     puts(str);
 }
 
-void ocall_print_log(uint level, const char *log) {
+void ocall_print_log(unsigned level, const char *log) {
     spdlog::log((spdlog::level::level_enum) level, log);
 }

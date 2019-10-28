@@ -8,14 +8,13 @@
 #include "../raft/include/cornerstone.hxx"
 #include "log_level.hxx"
 #include <string>
+#include "raft_enclave_t.h"
 
 using std::string;
 
-void ocall_print_log(uint level, const char *log);
-
 
 class LoggerPort : public cornerstone::logger {
-    static void log(uint level, const string &message) {
+    static void log(unsigned level, const string &message) {
         ocall_print_log(level, message.c_str());
     }
 

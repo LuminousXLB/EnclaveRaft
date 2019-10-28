@@ -4,5 +4,6 @@
 
 #include "logger_port.hxx"
 
-#include "../log_store/in_memory_log_store.hxx"
-#include "../log_store/in_memory_state_mgr.hxx"
+#include "../app_impl/in_memory_log_store.hxx"
+#include "../app_impl/in_memory_state_mgr.hxx"
+#include "../app_impl/echo_state_machine.hxx"

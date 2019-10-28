@@ -66,7 +66,7 @@ public:
      */
     void save_snapshot_data(snapshot &s, const ulong offset, buffer &data) override {
 //        TODO:
-        string put = strfmt<256>("SAVE SNAPSHOT DATA %ul %s").fmt(log_idx, data.get_str());
+        string put = strfmt<256>("SAVE SNAPSHOT DATA %ul %s").fmt(offset, data.get_str());
         ocall_puts(put.c_str());
     }
 
