@@ -54,9 +54,20 @@ public:
         ocall_puts(put.c_str());
     }
 
+    /**
+     * Save the given snapshot chunk to local snapshot.
+     * This API is for snapshot receiver (i.e., follower).
+     *
+     * Same as `commit()`, memory buffer is owned by caller.
+     *
+     * @param s Snapshot instance to save.
+     * @param offset Byte offset of given chunk.
+     * @param data Payload of given chunk.
+     */
     void save_snapshot_data(snapshot &s, const ulong offset, buffer &data) override {
 //        TODO:
-
+        string put = strfmt<256>("SAVE SNAPSHOT DATA %ul %s").fmt(log_idx, data.get_str());
+        ocall_puts(put.c_str());
     }
 
     bool apply_snapshot(snapshot &s) override {
@@ -76,6 +87,16 @@ public:
         return true;
     }
 
+    /**
+     * Read the given snapshot chunk.
+     * This API is for snapshot sender (i.e., leader).
+     *
+     * @param s Snapshot instance to read.
+     * @param offset Byte offset of given chunk.
+     * @param[out] data Buffer where the read chunk will be stored.
+     * @return Amount of bytes read.
+     *         0 if failed.
+     */
     int read_snapshot_data(snapshot &s, const ulong offset, buffer &data) override {
 //        TODO:
         return 0;

@@ -81,7 +81,7 @@ public:
     }
 
     void system_exit(const int exit_code) override {
-        // TODO: Make sure if there's something to do
+        // TODO: See if there's something to do
     }
 
     ptr<srv_config> get_srv_config() const { return my_srv_config_; }
