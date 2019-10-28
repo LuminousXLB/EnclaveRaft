@@ -78,7 +78,7 @@ private:
             return;
         }
 
-        shared_ptr<asio_rpc_listener> self(this->shared_from_this<asio_rpc_listener>());
+        shared_ptr<asio_rpc_listener> self(this->shared_from_this());
 
         shared_ptr<rpc_session> session(make_shared<rpc_session>(
                 io_svc_,

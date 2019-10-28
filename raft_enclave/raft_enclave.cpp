@@ -22,19 +22,19 @@ using cornerstone::rpc_client_factory;
 using cornerstone::context;
 using cornerstone::raft_server;
 
+using raft_app_context  = pair<shared_ptr<raft_server>, shared_ptr<rpc_listener>>;
 
-pair<shared_ptr<raft_server>, shared_ptr<rpc_listener>> run_raft_instance(int srv_id, const string &endpoint);
+raft_app_context run_raft_instance(int srv_id, const string &endpoint);
 
 
-
-void ecall_init(int srv_id, const char * endpoint) {
+void ecall_init(int srv_id, const char *endpoint, uint16_t port) {
 
 }
 
-pair<shared_ptr<raft_server>, shared_ptr<rpc_listener>> run_raft_instance(int srv_id, const string &endpoint) {
+raft_app_context run_raft_instance(int srv_id, const string &endpoint, uint16_t port) {
     shared_ptr<logger> p_logger = make_shared<LoggerPort>();
 
-    shared_ptr<rpc_listener> p_listener = make_shared<RpcListenerPort>();
+    shared_ptr<rpc_listener> p_listener = make_shared<RpcListenerPort>(port);
     shared_ptr<state_mgr> p_manager = make_shared<in_memory_state_mgr>(srv_id, endpoint);
     shared_ptr<state_machine> p_machine = make_shared<echo_state_machine>();
 

@@ -4,3 +4,18 @@
 
 
 #include "asio_rpc_listener.hxx"
+#include "raft_enclave_u.h"
+
+extern shared_ptr<asio::io_context> global_io_context;
+extern shared_ptr<spdlog::logger> global_logger;
+
+static shared_ptr<asio_rpc_listener> listener;
+
+void ocall_rpc_listener_create(uint16_t port) {
+    listener = make_shared<asio_rpc_listener>(*global_io_context, port, global_logger);
+    listener->listen();
+}
+
+void ocall_rpc_listener_stop() {
+    listener->stop();
+}

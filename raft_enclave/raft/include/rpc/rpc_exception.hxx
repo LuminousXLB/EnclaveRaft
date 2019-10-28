@@ -18,6 +18,8 @@
 #ifndef _RPC_EXCEPTION_HXX_
 #define _RPC_EXCEPTION_HXX_
 
+#include "req_msg.hxx"
+
 namespace cornerstone {
     class rpc_exception : public std::exception {
     public:

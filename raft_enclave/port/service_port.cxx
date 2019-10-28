@@ -4,26 +4,21 @@
 
 #include "service_port.hxx"
 
-map<uint64_t, function<void(error_code)>> _task_pool;
-mutex _task_pool_lock;
-
-
-// TODO: impl this outside enclave
-void ocall_schedule_delayed_task(uint64_t task_uid, int32_t milliseconds);
-
-void ocall_cancel_delayed_task(uint64_t task_uid);
+map<uint64_t, function<void(bool)>> service_task_pool;
+mutex service_task_pool_lock;
 
 
 // TODO: log this into edl
-void ecall_timer_expired_callback(uint64_t task_uid, error_code err) {
-    map<uint64_t, function<void(error_code)>>::iterator callback;
+void ecall_timer_expired_callback(uint64_t task_uid, bool success) {
+    map<uint64_t, function<void(bool)>>::iterator callback;
+
     {
-        lock_guard<mutex> lock(_task_pool_lock);
-        callback = _task_pool.find(task_uid);
+        lock_guard<mutex> lock(service_task_pool_lock);
+        callback = service_task_pool.find(task_uid);
     }
 
-    if (callback != _task_pool.end()) {
-        callback->second(err);
+    if (callback != service_task_pool.end()) {
+        callback->second(success);
     }
 }
 

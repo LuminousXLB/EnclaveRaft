@@ -62,34 +62,24 @@ public:
     void start() {
         shared_ptr<rpc_session> self = shared_from_this(); // this is safe since we only expose ctor to cs_new
 
+        asio::read(socket_, asio::buffer(&data_size, sizeof(uint32_t)));
+        if (data_size < 0 || data_size > 0x1000000) {
+            logger_->warn(
+                    "bad log data size in the header {}, stop this session to protect further corruption",
+                    data_size);
+            this->stop();
+            return;
+        }
 
-        asio::async_read(socket_, asio::buffer(&data_size, sizeof(uint32_t)),
-                         [this, self](const asio::error_code &err, size_t) -> void {
-                             if (!err) {
-                                 if (data_size < 0 || data_size > 0x1000000) {
-                                     logger_->warn(
-                                             "bad log data size in the header {}, stop this session to protect further corruption",
-                                             data_size);
-                                     this->stop();
-                                     return;
-                                 }
+        if (data_size == 0) {
+            this->read_complete();
+            return;
+        }
 
-                                 if (data_size == 0) {
-                                     this->read_complete();
-                                     return;
-                                 }
-
-                                 message_buffer.resize((size_t) data_size);
-
-                                 asio::async_read(this->socket_,
-                                                  asio::buffer(message_buffer),
-                                                  std::bind(&rpc_session::read_log_data, self,
-                                                            std::placeholders::_1, std::placeholders::_2));
-                             } else {
-                                 logger_->error("failed to read rpc header from socket due to error {}", err.value());
-                                 this->stop();
-                             }
-                         });
+        message_buffer.resize((size_t) data_size);
+        asio::async_read(this->socket_,
+                         asio::buffer(message_buffer),
+                         std::bind(&rpc_session::read_log_data, self, std::placeholders::_1, std::placeholders::_2));
     }
 
     void stop() {
@@ -117,7 +107,10 @@ private:
         shared_ptr<rpc_session> self = this->shared_from_this();
 
         auto resp_buf = handler_(message_buffer);
+        uint32_t length = resp_buf->size();
+
         if (resp_buf) {
+            asio::write(socket_, asio::buffer(&length, sizeof(length)));
             asio::async_write(
                     socket_,
                     asio::buffer(*resp_buf),

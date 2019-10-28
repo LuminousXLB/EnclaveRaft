@@ -23,13 +23,14 @@ using cornerstone::resp_msg;
 using cornerstone::lstrfmt;
 
 
-ptr<msg_handler> raft_msg_handler_;
-mutex message_buffer_lock;
-atomic<uint32_t> id_counter;
-map<uint32_t, bufptr> message_buffer;
+ptr<msg_handler> rpc_listener_req_handler;
+
+static mutex message_buffer_lock;
+static atomic<uint32_t> id_counter;
+static map<uint32_t, bufptr> message_buffer;
 
 int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t *msg_id) {
-    // TODO: Encrypt & Decrypt
+    // FIXME: Encrypt & Decrypt
     bufptr header = buffer::alloc(RPC_REQ_HEADER_SIZE);
     memcpy_s(header->data(), header->size(), message, RPC_REQ_HEADER_SIZE);
 
@@ -65,9 +66,10 @@ int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t
             }
         }
 
-        ptr<resp_msg> resp = raft_msg_handler_->process_req(*req);
+        ptr<resp_msg> resp = rpc_listener_req_handler->process_req(*req);
+
         if (!resp) {
-            raft_msg_handler_->get_logger()->err(
+            rpc_listener_req_handler->get_logger()->err(
                     "no response is returned from raft message handler, potential system bug");
             *msg_id = 0;
             return 0;
@@ -91,7 +93,7 @@ int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t
         }
     }
     catch (std::exception &ex) {
-        raft_msg_handler_->get_logger()->err(
+        rpc_listener_req_handler->get_logger()->err(
                 lstrfmt("failed to process request message due to error: %s").fmt(ex.what()));
         return -1;
     }

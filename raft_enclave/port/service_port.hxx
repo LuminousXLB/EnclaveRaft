@@ -19,7 +19,6 @@ using std::string;
 using std::map;
 using std::lock_guard;
 using std::function;
-using std::error_code;
 
 using cornerstone::delayed_task_scheduler;
 using cornerstone::rpc_client_factory;
@@ -28,8 +27,8 @@ using cornerstone::rpc_client;
 using cornerstone::delayed_task;
 using cornerstone::cs_new;
 
-extern map<uint64_t, function<void(error_code)>> _task_pool;
-extern mutex _task_pool_lock;
+extern map<uint64_t, function<void(bool)>> service_task_pool;
+extern mutex service_task_pool_lock;
 
 
 void _free_task_context_(void *ptr) {
@@ -38,8 +37,8 @@ void _free_task_context_(void *ptr) {
 }
 
 
-void _timer_handler_(ptr<delayed_task> &task, error_code err) {
-    if (!err) {
+void _timer_handler_(ptr<delayed_task> &task, bool success) {
+    if (success) {
         task->execute();
     }
 }
@@ -61,10 +60,10 @@ __nocopy__(ServicePort)
         auto *task_uid = static_cast<uint64_t *> (task->get_impl_context());
 
         {
-            lock_guard<mutex> lock(_task_pool_lock);
-            ocall_schedule_delayed_task(*task_uid, milliseconds);
-            _task_pool[*task_uid] = bind(&_timer_handler_, task, std::placeholders::_1);
+            lock_guard<mutex> lock(service_task_pool_lock);
+            service_task_pool[*task_uid] = bind(&_timer_handler_, task, std::placeholders::_1);
         }
+        ocall_schedule_delayed_task(*task_uid, milliseconds);
     }
 
     // From rpc_client_factory

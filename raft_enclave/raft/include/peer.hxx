@@ -26,6 +26,7 @@
 #include "rpc/req_msg.hxx"
 #include "rpc/resp_msg.hxx"
 #include "rpc/rpc_client_interface.hxx"
+#include "context.hxx"
 
 namespace cornerstone {
     class peer {

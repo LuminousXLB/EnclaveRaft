@@ -12,10 +12,7 @@ using cornerstone::ptr;
 using cornerstone::msg_handler;
 using cornerstone::rpc_listener;
 
-extern ptr<msg_handler> raft_msg_handler_;
-
-// TODO: impl this outside the enclave
-void ocall_rpc_listener_set(bool start);
+extern ptr<msg_handler> rpc_listener_req_handler;
 
 
 // request header, ulong term (8), msg_type type (1), int32 src (4), int32 dst (4), ulong last_log_term (8), ulong last_log_idx (8), ulong commit_idx (8) + one int32 (4) for log data size
@@ -25,16 +22,24 @@ void ocall_rpc_listener_set(bool start);
 #define RPC_RESP_HEADER_SIZE 4 * 2 + 8 * 2 + 2
 
 
+
+
+
 class RpcListenerPort : public rpc_listener {
 public:
+    explicit RpcListenerPort(uint16_t port) : port_(port) {}
+
     void listen(ptr<msg_handler> &handler) override {
-        raft_msg_handler_ = handler;
-        ocall_rpc_listener_set(true);
+        rpc_listener_req_handler = handler;
+        ocall_rpc_listener_create(port_);
     }
 
     void stop() override {
-        ocall_rpc_listener_set(false);
+        ocall_rpc_listener_stop();
     }
+
+private:
+    uint16_t port_;
 };
 
 #endif //ENCLAVERAFT_RPC_LISTENER_PORT_HXX
