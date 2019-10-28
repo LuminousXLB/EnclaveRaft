@@ -18,9 +18,10 @@
 #ifndef _RPC_LISTENER_HXX_
 #define _RPC_LISTENER_HXX_
 
+#include "../raft_server.hxx"
+
 namespace cornerstone {
     // for backward compatibility
-    class raft_server;
 
     typedef raft_server msg_handler;
 
@@ -28,7 +29,7 @@ namespace cornerstone {
     __interface_body__(rpc_listener)
 
     public:
-        virtual void listen(ptr <msg_handler> &handler) = 0;
+        virtual void listen(ptr<msg_handler> &handler) = 0;
 
         virtual void stop() = 0;
     };

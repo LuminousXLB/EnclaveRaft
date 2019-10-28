@@ -11,7 +11,6 @@ include_directories(${SGX_INCLUDE_DIR})
 ##### spdlog ##########################################################################################################
 
 add_subdirectory(third_party/spdlog-1.4.2)
-include_directories(third_party/spdlog-1.4.2/include)
 
 #######################################################################################################################
 
@@ -52,6 +51,8 @@ add_untrusted_executable(App_raft
         EDL_SEARCH_PATHS raft_enclave)
 
 target_link_libraries(App_raft sgx_utils spdlog::spdlog)
+target_include_directories(App_raft PRIVATE third_party/spdlog-1.4.2/include)
+target_include_directories(App_raft PRIVATE third_party/asio-1.12.2/include)
 
 add_dependencies(App_raft Enclave_raft-sign)
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/logs")

@@ -37,6 +37,10 @@ using cornerstone::strfmt;
 
 class echo_state_machine : public state_machine {
 public:
+    echo_state_machine() : last_committed_idx_(0) {}
+
+    ~echo_state_machine() override = default;
+
     void pre_commit(const ulong log_idx, buffer &data) override {
         string put = strfmt<256>("PRE_COMMIT %ul %s").fmt(log_idx, data.get_str());
         ocall_puts(put.c_str());

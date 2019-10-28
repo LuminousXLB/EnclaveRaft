@@ -26,30 +26,26 @@
 #include "async_task/delayed_task_scheduler_interface.hxx"
 #include "raft_params.hxx"
 
-
 namespace cornerstone {
     struct context {
     public:
-        context(ptr<state_mgr> &mgr,
-                ptr<state_machine> &m,
-                ptr<rpc_listener> &listener,
-                ptr<logger> &l,
-                ptr<rpc_client_factory> &cli_factory,
-                ptr<delayed_task_scheduler> &scheduler,
-                std::function<time_point()> get_time_function,
-                raft_params *params = nilptr
-        )
+        context(
+                ptr<state_mgr>& mgr,
+                ptr<state_machine>& m,
+                ptr<rpc_listener>& listener,
+                ptr<logger>& l,
+                ptr<rpc_client_factory>& cli_factory,
+                ptr<delayed_task_scheduler>& scheduler,
+                raft_params* params = nilptr)
                 : state_mgr_(mgr),
                   state_machine_(m),
                   rpc_listener_(listener),
                   logger_(l),
                   rpc_cli_factory_(cli_factory),
                   scheduler_(scheduler),
-                  get_time_(std::move(get_time_function)),
                   params_(params == nilptr ? new raft_params : params) {}
 
     __nocopy__(context)
-
     public:
         ptr<state_mgr> state_mgr_;
         ptr<state_machine> state_machine_;
@@ -58,7 +54,6 @@ namespace cornerstone {
         ptr<rpc_client_factory> rpc_cli_factory_;
         ptr<delayed_task_scheduler> scheduler_;
         std::unique_ptr<raft_params> params_;
-        std::function<time_point()> get_time_;
     };
 }
 

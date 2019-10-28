@@ -64,14 +64,13 @@ namespace cornerstone {
                                                            std::placeholders::_2)),
                   last_snapshot_(ctx->state_machine_->last_snapshot()),
                   voted_servers_(),
-                  get_time_(ctx->get_time_) {
-
-//            uint seed = (uint) (std::chrono::system_clock::now().time_since_epoch().count() * id_);
-//            std::default_random_engine engine(seed);
+        {
             random_device engine;
             std::uniform_int_distribution<int32> distribution(ctx->params_->election_timeout_lower_bound_,
                                                               ctx->params_->election_timeout_upper_bound_);
-            rand_timeout_ = std::bind(distribution, engine);
+            rand_timeout_ = [&distribution, &engine]() -> int32 {
+                return distribution(engine);
+            };
 
             if (!state_) {
                 state_ = cs_new<srv_state>();
@@ -149,6 +148,10 @@ namespace cornerstone {
     __nocopy__(raft_server)
 
     public:
+        ptr<logger> get_logger() {
+            return l_;
+        }
+
         ptr<resp_msg> process_req(req_msg &req);
 
         ptr<async_result<bool>> add_srv(const srv_config &srv);
@@ -284,7 +287,6 @@ namespace cornerstone {
         rpc_handler ex_resp_handler_;
         ptr<snapshot> last_snapshot_;
         std::unordered_set<int32> voted_servers_;
-        std::function<time_point()> get_time_;
     };
 }
 #endif //_RAFT_SERVER_HXX_

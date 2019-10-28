@@ -7,6 +7,7 @@
 
 #include "../raft/include/cornerstone.hxx"
 #include "rpc_client_port.hxx"
+#include "raft_enclave_t.h"
 #include <memory>
 #include <functional>
 #include <map>
@@ -27,38 +28,21 @@ using cornerstone::rpc_client;
 using cornerstone::delayed_task;
 using cornerstone::cs_new;
 
-static map<uint64_t, function<void(error_code)>> _task_pool;
-static mutex _task_pool_lock;
+extern map<uint64_t, function<void(error_code)>> _task_pool;
+extern mutex _task_pool_lock;
 
-// TODO: impl this outside enclave
-void ocall_schedule_delayed_task(uint64_t task_uid, int32_t milliseconds);
-
-void ocall_cancel_delayed_task(uint64_t task_uid);
-
-// TODO: log this into edl
-void ecall_timer_expired_callback(uint64_t task_uid, error_code err) {
-    map<uint64_t, function<void(error_code)>>::iterator callback;
-    {
-        lock_guard<mutex> lock(_task_pool_lock);
-        callback = _task_pool.find(task_uid);
-    }
-
-    if (callback != _task_pool.end()) {
-        callback->second(err);
-    }
-}
 
 void _free_task_context_(void *ptr) {
     auto *uid = static_cast<uint64_t *> (ptr);
     delete uid;
 }
 
+
 void _timer_handler_(ptr<delayed_task> &task, error_code err) {
     if (!err) {
         task->execute();
     }
 }
-
 
 class ServicePort : public delayed_task_scheduler, public rpc_client_factory {
 public:
