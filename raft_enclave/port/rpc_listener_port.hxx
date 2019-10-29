@@ -22,9 +22,6 @@ extern ptr<msg_handler> rpc_listener_req_handler;
 #define RPC_RESP_HEADER_SIZE 4 * 2 + 8 * 2 + 2
 
 
-
-
-
 class RpcListenerPort : public rpc_listener {
 public:
     explicit RpcListenerPort(uint16_t port) : port_(port) {}
