@@ -18,6 +18,10 @@
 #ifndef _BUFFER_HXX_
 #define _BUFFER_HXX_
 
+#include "pp_util.hxx"
+#include "ptr.hxx"
+#include "basic_types.hxx"
+
 namespace cornerstone {
 
     class buffer;

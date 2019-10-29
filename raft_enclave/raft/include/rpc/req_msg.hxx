@@ -19,6 +19,7 @@
 #define _REG_MSG_HXX_
 
 #include "msg_base.hxx"
+#include "../contribution/log_entry.hxx"
 
 namespace cornerstone {
     class req_msg : public msg_base {
@@ -29,8 +30,7 @@ namespace cornerstone {
                   commit_idx_(commit_idx), log_entries_() {
         }
 
-        virtual ~req_msg() __override__ {
-        }
+        ~req_msg() __override__ = default;
 
     __nocopy__(req_msg)
 
@@ -47,9 +47,7 @@ namespace cornerstone {
             return commit_idx_;
         }
 
-        std::vector<ptr<log_entry>> &
-
-        log_entries() {
+        std::vector<ptr<log_entry>> &log_entries() {
             return log_entries_;
         }
 

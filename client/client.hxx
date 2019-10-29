@@ -1,0 +1,8 @@
+//
+// Created by ncl on 29/10/19.
+//
+
+#ifndef ENCLAVERAFT_CLIENT_HXX
+#define ENCLAVERAFT_CLIENT_HXX
+
+#endif //ENCLAVERAFT_CLIENT_HXX

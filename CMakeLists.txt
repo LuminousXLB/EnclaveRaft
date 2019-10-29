@@ -56,3 +56,12 @@ target_include_directories(App_raft PRIVATE third_party/asio-1.12.2/include)
 
 add_dependencies(App_raft Enclave_raft-sign)
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/logs")
+
+#######################################################################################################################
+
+file(GLOB TEST_CLIENT_SRCS client/*.cxx)
+
+add_executable(client ${TEST_CLIENT_SRCS} raft_enclave/raft/src/buffer.cxx)
+target_link_libraries(client spdlog::spdlog pthread)
+target_include_directories(client PRIVATE third_party/spdlog-1.4.2/include)
+target_include_directories(client PRIVATE third_party/asio-1.12.2/include)
