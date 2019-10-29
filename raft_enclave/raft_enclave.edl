@@ -4,6 +4,9 @@ enclave {
     include "stdbool.h"
 
     trusted {
+        public void ecall_raft_instance_run(int srv_id, [in, string] const char *address, uint16_t port);
+        public void ecall_raft_instance_stop();
+
         /* => service_port.cxx */
         public void ecall_timer_expired_callback(uint64_t task_uid, bool success);
 

@@ -70,6 +70,9 @@ public:
     }
 
     void listen() {
+        auto local = acceptor_.local_endpoint();
+        logger_->info("listening at {}:{}", local.address().to_string(), local.port());
+
         start();
     }
 

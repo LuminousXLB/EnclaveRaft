@@ -60,6 +60,12 @@ public:
 
 public:
     void start() {
+        auto remote = socket_.remote_endpoint();
+        auto local = socket_.local_endpoint();
+
+        logger_->info("connect to {}:{} from {}:{}",
+                       remote.address().to_string(), remote.port(), local.address().to_string(), local.port());
+
         shared_ptr<rpc_session> self = shared_from_this(); // this is safe since we only expose ctor to cs_new
 
         asio::read(socket_, asio::buffer(&data_size, sizeof(uint32_t)));

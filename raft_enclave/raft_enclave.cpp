@@ -21,15 +21,13 @@ using cornerstone::delayed_task_scheduler;
 using cornerstone::rpc_client_factory;
 using cornerstone::context;
 using cornerstone::raft_server;
+using cornerstone::sstrfmt;
 
 using raft_app_context  = pair<shared_ptr<raft_server>, shared_ptr<rpc_listener>>;
 
-raft_app_context run_raft_instance(int srv_id, const string &endpoint);
+static shared_ptr<raft_server> g_server = nullptr;
+static shared_ptr<rpc_listener> g_listener = nullptr;
 
-
-void ecall_init(int srv_id, const char *endpoint, uint16_t port) {
-
-}
 
 raft_app_context run_raft_instance(int srv_id, const string &endpoint, uint16_t port) {
     shared_ptr<logger> p_logger = make_shared<LoggerPort>();
@@ -66,17 +64,13 @@ raft_app_context run_raft_instance(int srv_id, const string &endpoint, uint16_t 
     return make_pair(p_server, p_listener);
 }
 
-#if 0
-void run_raft_instance_with_asio(int srv_id) {
-
-    context *ctx(new context(smgr, smachine, listener, l, rpc_cli_factory, scheduler, params));
-    ptr<raft_server> server(cs_new<raft_server>(ctx));
-    listener->listen(server);
-
-    {
-        std::unique_lock<std::mutex> ulock(lock1);
-        stop_cv1.wait(ulock);
-        listener->stop();
-    }
+void ecall_raft_instance_run(int srv_id, const char *address, uint16_t port) {
+    string endpoint = sstrfmt("tcp://%s:%d").fmt(address, port);
+    auto p = run_raft_instance(srv_id, endpoint, port);
+    g_server = p.first;
+    g_listener = p.second;
 }
-#endif
+
+void ecall_raft_instance_stop() {
+    g_listener->stop();
+}
