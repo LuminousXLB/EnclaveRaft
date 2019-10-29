@@ -550,6 +550,7 @@ ptr<resp_msg> raft_server::handle_rm_srv_req(req_msg &req) {
 }
 
 ptr<resp_msg> raft_server::handle_add_srv_req(req_msg &req) {
+
     std::vector<ptr<log_entry>> &entries(req.log_entries());
     ptr<resp_msg> resp(cs_new<resp_msg>(state_->get_term(), msg_type::add_server_response, id_, leader_));
     if (entries.size() != 1 || entries[0]->get_val_type() != log_val_type::cluster_server) {

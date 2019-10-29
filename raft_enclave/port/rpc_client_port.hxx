@@ -28,6 +28,7 @@ using cornerstone::bufptr;
 using cornerstone::req_msg;
 using cornerstone::log_entry;
 using cornerstone::rpc_handler;
+using cornerstone::lstrfmt;
 
 
 using callback_item = pair<ptr<req_msg>, rpc_handler>;

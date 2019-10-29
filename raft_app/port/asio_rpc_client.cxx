@@ -70,7 +70,7 @@ void ocall_send_rpc_request(uint32_t client_uid, uint32_t size, const uint8_t *m
         }
     }
 
-    if (!client) {
+    if (client) {
         client->send(request_uid, message, size);
     }
 }

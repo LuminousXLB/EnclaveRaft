@@ -18,6 +18,7 @@
 #ifndef _PEER_HXX_
 #define _PEER_HXX_
 
+#include <raft_enclave_t.h>
 #include "async_task/delayed_task.hxx"
 #include "async_task/timer_task.hxx"
 #include "async_task/delayed_task_scheduler_interface.hxx"
@@ -152,7 +153,6 @@ namespace cornerstone {
                     &peer::handle_rpc_result,
                     this, req, pending, std::placeholders::_1, std::placeholders::_2
             );
-
             rpc_->send(req, h);
         }
 

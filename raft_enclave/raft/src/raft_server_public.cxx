@@ -50,6 +50,7 @@ ptr<resp_msg> raft_server::process_req(req_msg &req) {
         }
     }
 
+
     ptr<resp_msg> resp;
     if (req.get_type() == msg_type::append_entries_request) {
         resp = handle_append_entries(req);
