@@ -32,12 +32,13 @@ class in_memory_state_mgr : public state_mgr {
 public:
     in_memory_state_mgr(int srv_id, const string &endpoint)
             : my_id_(srv_id), my_endpoint_(endpoint), cur_log_store_(cs_new<in_memory_log_store>()) {
-
-        my_srv_config_ = cs_new<srv_config>(srv_id, endpoint);
-
         // Initial cluster config: contains only one server (myself).
         saved_config_ = cs_new<cluster_config>();
-        saved_config_->get_servers().push_back(my_srv_config_);
+        saved_config_->get_servers().push_back(cs_new<srv_config>(srv_id, endpoint));
+
+//        saved_config_->get_servers().push_back(cs_new<srv_config>(1, "tcp://127.0.0.1:9001"));
+//        saved_config_->get_servers().push_back(cs_new<srv_config>(2, "tcp://127.0.0.1:9002"));
+//        saved_config_->get_servers().push_back(cs_new<srv_config>(3, "tcp://127.0.0.1:9003"));
     }
 
     ~in_memory_state_mgr() override = default;

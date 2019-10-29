@@ -71,6 +71,10 @@ void ecall_raft_instance_run(int srv_id, const char *address, uint16_t port) {
     g_listener = p.second;
 }
 
+void ecall_raft_instance_commit_bg() {
+    g_server->commit_in_bg();
+}
+
 void ecall_raft_instance_stop() {
     g_listener->stop();
 }

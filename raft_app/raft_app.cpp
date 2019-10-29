@@ -50,7 +50,12 @@ int main(int argc, char const *argv[]) {
     }
 
     unsigned int cpu_cnt = std::thread::hardware_concurrency();
-    if (cpu_cnt == 0) {
+
+    thread t(std::bind(ecall_raft_instance_commit_bg, global_enclave_id));
+    t.detach();
+    cpu_cnt -= 1;
+
+    if (cpu_cnt < 1) {
         cpu_cnt = 1;
     }
 

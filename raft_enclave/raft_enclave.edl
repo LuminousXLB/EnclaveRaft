@@ -5,6 +5,7 @@ enclave {
 
     trusted {
         public void ecall_raft_instance_run(int srv_id, [in, string] const char *address, uint16_t port);
+        public void ecall_raft_instance_commit_bg();
         public void ecall_raft_instance_stop();
 
         /* => service_port.cxx */

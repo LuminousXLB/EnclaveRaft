@@ -127,6 +127,12 @@ ptr<resp_msg> raft_server::handle_cli_req(req_msg &req) {
     // optimization: check leader expiration
     static volatile int32 time_elapsed_since_quorum_resp(std::numeric_limits<int32>::max());
 
+    l_->debug("====== TRACE START");
+    l_->debug(lstrfmt("|>> %s | %s").fmt(__FILE__, __FUNCTION__));
+    l_->debug(sstrfmt("| role_ == srv_role::leader -> %d").fmt(role_ == srv_role::leader));
+    l_->debug(sstrfmt("| peers_.empty()            -> %d").fmt(peers_.empty()));
+    l_->debug("====== TRACE END");
+
     if (role_ == srv_role::leader && !peers_.empty() &&
         time_elapsed_since_quorum_resp > ctx_->params_->election_timeout_upper_bound_ * 2) {
 

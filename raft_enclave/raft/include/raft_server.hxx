@@ -118,11 +118,8 @@ namespace cornerstone {
                 }
             }
 
-////            TODO: This part should be moved out of enclave
-//            std::thread commiting_thread = std::thread(std::bind(&raft_server::commit_in_bg, this));
-//            commiting_thread.detach();
-//            restart_election_timer();
-//            l_->debug(strfmt<30>("server %d started").fmt(id_));
+            restart_election_timer();
+            l_->debug(strfmt<30>("server %d started").fmt(id_));
         }
 
         virtual ~raft_server() {
@@ -157,6 +154,8 @@ namespace cornerstone {
         ptr<async_result<bool>> remove_srv(const int srv_id);
 
         ptr<async_result<bool>> append_entries(std::vector<bufptr> &logs);
+
+        void commit_in_bg();
 
     private:
         typedef std::unordered_map<int32, ptr<peer>>::
@@ -242,8 +241,6 @@ namespace cornerstone {
         void on_retryable_req_err(ptr<peer> &p, ptr<req_msg> &req);
 
         ulong term_for_log(ulong log_idx);
-
-        void commit_in_bg();
 
         ptr<async_result<bool>> send_msg_to_leader(ptr<req_msg> &req);
 
