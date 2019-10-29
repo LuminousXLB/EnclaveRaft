@@ -23,6 +23,7 @@
 #include <asio.hpp>
 #include <memory>
 #include <utility>
+#include <spdlog/fmt/bin_to_hex.h>
 
 using std::shared_ptr;
 using std::mutex;
@@ -64,7 +65,7 @@ public:
         auto local = socket_.local_endpoint();
 
         logger_->info("connect to {}:{} from {}:{}",
-                       remote.address().to_string(), remote.port(), local.address().to_string(), local.port());
+                      remote.address().to_string(), remote.port(), local.address().to_string(), local.port());
 
         shared_ptr<rpc_session> self = shared_from_this(); // this is safe since we only expose ctor to cs_new
 
@@ -83,6 +84,8 @@ public:
         }
 
         message_buffer.resize((size_t) data_size);
+        logger_->debug("{}: data_size = {}", __FILE__, data_size);
+
         asio::async_read(this->socket_,
                          asio::buffer(message_buffer),
                          std::bind(&rpc_session::read_log_data, self, std::placeholders::_1, std::placeholders::_2));
@@ -111,6 +114,8 @@ private:
 
     void read_complete() {
         shared_ptr<rpc_session> self = this->shared_from_this();
+
+        logger_->debug("{}: req read = {}", __FILE__, spdlog::to_hex(message_buffer));
 
         auto resp_buf = handler_(message_buffer);
         uint32_t length = resp_buf->size();

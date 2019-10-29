@@ -44,12 +44,19 @@ std::shared_ptr<resp_msg> deserialize_resp(const bufptr &resp_buf);
 
 bufptr send(asio::io_context &io_ctx, uint16_t port, const bufptr &req_buf) {
     auto resp_buf = buffer::alloc(RPC_RESP_HEADER_SIZE);
-    spdlog::info("Sending message to {}: {}", port, req_buf->size());
+    uint32_t size = req_buf->size();
+
+    spdlog::info("Sending message to {}: {}", port, size);
+
 
     tcp::socket s(io_ctx);
     tcp::resolver resolver(io_ctx);
     asio::connect(s, resolver.resolve("127.0.0.1", std::to_string(port)));
+
+    asio::write(s, asio::buffer(&size, sizeof(uint32_t)));
     asio::write(s, asio::buffer(req_buf->data(), req_buf->size()));
+
+    asio::read(s, asio::buffer(&size, sizeof(uint32_t)));
     size_t reply_length = asio::read(s, asio::buffer(resp_buf->data(), resp_buf->size()));
 
     spdlog::info("Fetched reply from {}: {}", port, reply_length);
@@ -69,7 +76,7 @@ int main() {
                                                              0,
                                                              0);
 
-    bufptr buf = buffer::alloc(100);
+    bufptr buf = buffer::alloc(20);
     buf->put("hello");
     buf->pos(0);
     req->log_entries().push_back(std::make_shared<log_entry>(0, std::move(buf)));

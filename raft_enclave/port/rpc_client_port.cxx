@@ -32,6 +32,7 @@ void ecall_rpc_response(uint32_t req_uid, uint32_t size, const uint8_t *msg, con
         // FIXME: Encrypt & Decrypt
         memcpy_s(resp_buf->data(), resp_buf->size(), msg, size);
 
+        resp_buf->pos(0);
         byte msg_type_val = resp_buf->get_byte();
         int32 src = resp_buf->get_int();
         int32 dst = resp_buf->get_int();

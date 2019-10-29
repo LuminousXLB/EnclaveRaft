@@ -69,15 +69,13 @@ private:
         // serialize req, send and read response
         std::vector<bufptr> log_entry_bufs;
         int32 log_data_size(0);
-        for (std::vector<ptr<log_entry>>::const_iterator it = req->log_entries().begin();
-             it != req->log_entries().end();
-             ++it) {
-            bufptr entry_buf(buffer::alloc(8 + 1 + 4 + (*it)->get_buf().size()));
-            entry_buf->put((*it)->get_term());
-            entry_buf->put((byte) ((*it)->get_val_type()));
-            entry_buf->put((int32) (*it)->get_buf().size());
-            (*it)->get_buf().pos(0);
-            entry_buf->put((*it)->get_buf());
+        for (auto &it : req->log_entries()) {
+            bufptr entry_buf(buffer::alloc(8 + 1 + 4 + it->get_buf().size()));
+            entry_buf->put(it->get_term());
+            entry_buf->put((byte) (it->get_val_type()));
+            entry_buf->put((int32) it->get_buf().size());
+            it->get_buf().pos(0);
+            entry_buf->put(it->get_buf());
             entry_buf->pos(0);
             log_data_size += (int32) entry_buf->size();
             log_entry_bufs.emplace_back(std::move(entry_buf));
