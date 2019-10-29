@@ -64,7 +64,7 @@ namespace cornerstone {
                   ex_resp_handler_((rpc_handler) std::bind(&raft_server::handle_ext_resp, this, std::placeholders::_1,
                                                            std::placeholders::_2)),
                   last_snapshot_(ctx->state_machine_->last_snapshot()),
-                  voted_servers_(), {
+                  voted_servers_() {
             random_device engine;
             std::uniform_int_distribution<int32> distribution(ctx->params_->election_timeout_lower_bound_,
                                                               ctx->params_->election_timeout_upper_bound_);

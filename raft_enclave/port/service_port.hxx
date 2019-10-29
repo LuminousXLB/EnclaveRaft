@@ -31,17 +31,9 @@ extern map<uint64_t, function<void(bool)>> service_task_pool;
 extern mutex service_task_pool_lock;
 
 
-void _free_task_context_(void *ptr) {
-    auto *uid = static_cast<uint64_t *> (ptr);
-    delete uid;
-}
+void _free_task_context_(void *ptr);
 
-
-void _timer_handler_(ptr<delayed_task> &task, bool success) {
-    if (success) {
-        task->execute();
-    }
-}
+void _timer_handler_(ptr<delayed_task> &task, bool success);
 
 class ServicePort : public delayed_task_scheduler, public rpc_client_factory {
 public:

@@ -86,7 +86,7 @@ int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t
             {
                 lock_guard<mutex> lock(message_buffer_lock);
                 *msg_id = ++id_counter;
-                message_buffer[*msg_id] = std::move(resp_buf);
+                message_buffer.emplace(*msg_id, buffer::copy(*resp_buf));
             }
 
             return RPC_RESP_HEADER_SIZE;

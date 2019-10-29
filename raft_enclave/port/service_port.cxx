@@ -22,3 +22,13 @@ void ecall_timer_expired_callback(uint64_t task_uid, bool success) {
     }
 }
 
+void _free_task_context_(void *ptr) {
+    auto *uid = static_cast<uint64_t *> (ptr);
+    delete uid;
+}
+
+void _timer_handler_(ptr<delayed_task> &task, bool success) {
+    if (success) {
+        task->execute();
+    }
+}

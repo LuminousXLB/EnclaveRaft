@@ -18,10 +18,11 @@
 #ifndef _RPC_LISTENER_HXX_
 #define _RPC_LISTENER_HXX_
 
-#include "../raft_server.hxx"
+//#include "../raft_server.hxx"
 
 namespace cornerstone {
     // for backward compatibility
+    class raft_server;
 
     typedef raft_server msg_handler;
 

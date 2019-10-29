@@ -36,6 +36,8 @@ using tcp_resolver = asio::ip::tcp::resolver;
 
 using rpc_handler = function<void(char, char)>;
 
+extern sgx_enclave_id_t global_enclave_id;
+
 
 class asio_rpc_client : public std::enable_shared_from_this<asio_rpc_client> {
 public:
@@ -68,7 +70,7 @@ public:
                                                           std::placeholders::_2));
                         } else {
                             string e = fmt::format("failed to resolve host {} due to error {}", host_, err.value());
-                            ecall_rpc_response(request_uid, 0, nullptr, e.c_str());
+                            ecall_rpc_response(global_enclave_id, request_uid, 0, nullptr, e.c_str());
                         }
                     }
             );
@@ -91,7 +93,7 @@ private:
             this->send(request_uid, message, size);
         } else {
             string e = fmt::format("failed to connect to remote socket due to error %d", err.value());
-            ecall_rpc_response(request_uid, 0, nullptr, e.c_str());
+            ecall_rpc_response(global_enclave_id, request_uid, 0, nullptr, e.c_str());
         }
     }
 
@@ -111,17 +113,17 @@ private:
             );
         } else {
             string e = fmt::format("failed to send request to remote socket due to error %d", err.value());
-            ecall_rpc_response(request_uid, 0, nullptr, e.c_str());
+            ecall_rpc_response(global_enclave_id, request_uid, 0, nullptr, e.c_str());
             socket_.close();
         }
     }
 
     void response_read(uint32_t req_uid, const vector<uint8_t> &resp_buffer, asio::error_code err, size_t bytes_read) {
         if (!err) {
-            ecall_rpc_response(req_uid, resp_buffer.size(), resp_buffer.data(), nullptr);
+            ecall_rpc_response(global_enclave_id, req_uid, resp_buffer.size(), resp_buffer.data(), nullptr);
         } else {
             string e = fmt::format("failed to read response from remote socket due to error %d", err.value());
-            ecall_rpc_response(req_uid, 0, nullptr, e.c_str());
+            ecall_rpc_response(global_enclave_id, req_uid, 0, nullptr, e.c_str());
             socket_.close();
         }
     }
@@ -132,8 +134,6 @@ private:
     std::string host_;
     std::string port_;
 };
-
-}
 
 
 #endif //ENCLAVERAFT_ASIO_RPC_CLIENT_HXX

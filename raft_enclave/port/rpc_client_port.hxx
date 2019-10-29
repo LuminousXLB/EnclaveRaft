@@ -5,7 +5,7 @@
 #ifndef ENCLAVERAFT_RPC_CLIENT_PORT_HXX
 #define ENCLAVERAFT_RPC_CLIENT_PORT_HXX
 
-
+#include "raft_enclave_t.h"
 #include "../raft/include/cornerstone.hxx"
 #include "rpc_listener_port.hxx"
 
@@ -34,10 +34,16 @@ using callback_item = pair<ptr<req_msg>, rpc_handler>;
 extern map<uint64_t, callback_item> rpc_client_callback_pool;
 extern mutex rpc_client_callback_pool_lock;
 
+static uint32_t rpc_client_create(const string &endpoint) {
+    uint32_t ret_val;
+    sgx_status_t status = ocall_rpc_client_create(&ret_val, endpoint.c_str());
+    return ret_val;
+}
+
 
 class RpcClientPort : public rpc_client {
 public:
-    explicit RpcClientPort(const string &endpoint) : client_uid_(ocall_rpc_client_create(endpoint.c_str())),
+    explicit RpcClientPort(const string &endpoint) : client_uid_(rpc_client_create(endpoint)),
                                                      last_req_uid_(0) {}
 
     ~RpcClientPort() override {

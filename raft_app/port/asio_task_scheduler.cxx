@@ -18,6 +18,7 @@ using std::mutex;
 using std::lock_guard;
 using std::make_shared;
 
+extern sgx_enclave_id_t global_enclave_id;
 extern shared_ptr<asio::io_context> global_io_context;
 
 static mutex asio_task_scheduler_pool_lock;
@@ -30,9 +31,9 @@ void ocall_schedule_delayed_task(uint64_t task_uid, int32_t milliseconds) {
     timer->expires_after(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(milliseconds)));
     timer->async_wait([task_uid](asio::error_code err) -> void {
         if (!err) {
-            ecall_timer_expired_callback(task_uid, true);
+            ecall_timer_expired_callback(global_enclave_id, task_uid, true);
         } else {
-            ecall_timer_expired_callback(task_uid, false);
+            ecall_timer_expired_callback(global_enclave_id, task_uid, false);
         }
     });
 

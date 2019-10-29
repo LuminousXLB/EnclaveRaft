@@ -52,7 +52,7 @@ uint32_t ocall_rpc_client_create(const char *endpoint) {
     return client_id;
 }
 
-uint32_t ocall_rpc_client_close(uint32_t client_uid) {
+void ocall_rpc_client_close(uint32_t client_uid) {
     lock_guard<mutex> lock(rpc_client_pool_lock);
     auto it = rpc_client_pool.find(client_uid);
     if (it != rpc_client_pool.end()) {

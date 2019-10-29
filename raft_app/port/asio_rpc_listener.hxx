@@ -23,7 +23,7 @@
 #include <utility>
 #include <vector>
 #include <memory>
-
+#include "raft_enclave_u.h"
 #include <asio.hpp>
 #include <spdlog/spdlog.h>
 #include "rpc_session.hxx"
@@ -35,21 +35,22 @@ using std::vector;
 using std::make_shared;
 using std::enable_shared_from_this;
 
+extern sgx_enclave_id_t global_enclave_id;
 
-uint32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t *msg_id);
-
-void ecall_fetch_rpc_response(uint32_t msg_id, uint32_t buffer_size, uint8_t *buffer);
 
 shared_ptr<vector<uint8_t >> message_handler(const vector<uint8_t> &message) {
     uint32_t uid;
-    uint32_t resp_len = ecall_handle_rpc_request(message.size(), message.data(), &uid);
+    int32_t resp_len;
+    ecall_handle_rpc_request(global_enclave_id, &resp_len, message.size(), message.data(), &uid);
 
     if (resp_len == 0) {
         return nullptr;
     }
 
     auto buffer = make_shared<vector<uint8_t >>(resp_len, 0);
-    if (ecall_fetch_rpc_response(uid, buffer->size(), &buffer[0])) {
+    bool ret;
+    ecall_fetch_rpc_response(global_enclave_id, &ret, uid, buffer->size(), &(*buffer)[0]);
+    if (ret) {
         return buffer;
     } else {
         return nullptr;
