@@ -11,6 +11,7 @@
 #include <mutex>
 #include <atomic>
 #include <spdlog/logger.h>
+#include <spdlog/fmt/bin_to_hex.h>
 
 using std::regex;
 using std::smatch;
@@ -22,6 +23,7 @@ using std::mutex;
 using std::lock_guard;
 
 extern shared_ptr<asio::io_context> global_io_context;
+extern shared_ptr<spdlog::logger> global_logger;
 
 static mutex rpc_client_pool_lock;
 static atomic<uint32_t> rpc_client_id_counter;
@@ -29,6 +31,7 @@ static map<uint32_t, shared_ptr<asio_rpc_client>> rpc_client_pool;
 
 
 uint32_t ocall_rpc_client_create(const char *endpoint) {
+    global_logger->info("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, endpoint);
     // the endpoint is expecting to be protocol://host:port, and we only support tcp for this factory
     // which is endpoint must be tcp://hostname:port
 
@@ -53,6 +56,8 @@ uint32_t ocall_rpc_client_create(const char *endpoint) {
 }
 
 void ocall_rpc_client_close(uint32_t client_uid) {
+    global_logger->info("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, client_uid);
+
     lock_guard<mutex> lock(rpc_client_pool_lock);
     auto it = rpc_client_pool.find(client_uid);
     if (it != rpc_client_pool.end()) {
@@ -61,13 +66,15 @@ void ocall_rpc_client_close(uint32_t client_uid) {
 }
 
 void ocall_send_rpc_request(uint32_t client_uid, uint32_t size, const uint8_t *message, uint32_t request_uid) {
+    global_logger->info("{} {} {}: {} data_size {}", __FILE__, __FUNCTION__, __LINE__, client_uid, size);
+    global_logger->info("{} {} {}: {} send {}", __FILE__, __FUNCTION__, __LINE__, client_uid,
+                        spdlog::to_hex(message, message + size));
+
     shared_ptr<asio_rpc_client> client = nullptr;
     {
         lock_guard<mutex> lock(rpc_client_pool_lock);
         auto it = rpc_client_pool.find(client_uid);
-        if (it != rpc_client_pool.end()) {
-            rpc_client_pool.erase(it);
-        }
+        client = it->second;
     }
 
     if (client) {

@@ -25,6 +25,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <spdlog/spdlog.h>
+#include <spdlog/fmt/bin_to_hex.h>
 
 using std::vector;
 using std::string;
@@ -37,7 +39,7 @@ using tcp_resolver = asio::ip::tcp::resolver;
 using rpc_handler = function<void(char, char)>;
 
 extern sgx_enclave_id_t global_enclave_id;
-
+extern shared_ptr<spdlog::logger> global_logger;
 
 class asio_rpc_client : public std::enable_shared_from_this<asio_rpc_client> {
 public:
@@ -52,20 +54,23 @@ public:
 
 public:
     void send(uint32_t request_uid, const uint8_t *message, int32_t size) {
+        global_logger->debug("{} {} {}: TRACE", __FILE__, __FUNCTION__, __LINE__);
+
         shared_ptr<asio_rpc_client> self = shared_from_this();
 
         if (!socket_.is_open()) {
+            auto msg_buf = make_shared<vector<uint8_t>>(message, message + size);
+
             tcp_resolver::query q(host_, port_, tcp_resolver::query::all_matching);
             resolver_.async_resolve(
                     q,
-                    [self, this, request_uid, message, size](asio::error_code err,
-                                                             tcp_resolver::iterator iter) -> void {
+                    [self, this, request_uid, msg_buf](asio::error_code err,
+                                                       tcp_resolver::iterator iter) -> void {
                         if (!err) {
                             asio::async_connect(socket_, std::move(iter),
                                                 std::bind(&asio_rpc_client::connected, self,
                                                           request_uid,
-                                                          message,
-                                                          size,
+                                                          msg_buf,
                                                           std::placeholders::_1,
                                                           std::placeholders::_2));
                         } else {
@@ -87,10 +92,10 @@ public:
     }
 
 private:
-    void connected(uint32_t request_uid, const uint8_t *message, uint32_t size, std::error_code err,
+    void connected(uint32_t request_uid, const shared_ptr<vector<uint8_t>>& msg_buf, std::error_code err,
                    const tcp_resolver::iterator &iter) {
         if (!err) {
-            this->send(request_uid, message, size);
+            this->send(request_uid, msg_buf->data(), msg_buf->size());
         } else {
             string e = fmt::format("failed to connect to remote socket due to error %d", err.value());
             ecall_rpc_response(global_enclave_id, request_uid, 0, nullptr, e.c_str());
@@ -100,9 +105,14 @@ private:
     void sent(uint32_t request_uid, asio::error_code err, size_t bytes_transferred) {
         if (!err) {
             // read a response
-
             int32_t data_size;
-            asio::read(socket_, asio::buffer(&data_size, sizeof(uint32_t)));
+
+            asio::error_code ec;
+            asio::read(socket_, asio::buffer(&data_size, sizeof(uint32_t)), ec);
+            if (ec == asio::error::eof) {
+                socket_.close();
+                return;
+            }
 
             vector<uint8_t> message_buffer((size_t) data_size);
 

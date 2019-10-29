@@ -27,6 +27,8 @@ uint16_t add_server(asio::io_context &io_context, uint16_t leader_id, uint16_t s
 int main() {
     asio::io_context io_context;
 
-    uint16_t leader_id = add_server(io_context, 1, 2);
-//    leader_id = client_request(io_context, leader_id, "Hello");
+    uint16_t leader_id = 1;
+    leader_id = add_server(io_context, leader_id, 2);
+    leader_id = add_server(io_context, leader_id, 3);
+    leader_id = client_request(io_context, leader_id, "Hello");
 }

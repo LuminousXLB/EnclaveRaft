@@ -70,6 +70,8 @@ bufptr send(asio::io_context &io_ctx, uint16_t port, const bufptr &req_buf) {
 
     spdlog::info("Fetched reply from {}: {}", port, reply_length);
 
+    s.close();
+
     return resp_buf;
 }
 

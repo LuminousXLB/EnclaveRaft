@@ -127,12 +127,6 @@ ptr<resp_msg> raft_server::handle_cli_req(req_msg &req) {
     // optimization: check leader expiration
     static volatile int32 time_elapsed_since_quorum_resp(std::numeric_limits<int32>::max());
 
-    l_->debug("====== TRACE START");
-    l_->debug(lstrfmt("|>> %s | %s").fmt(__FILE__, __FUNCTION__));
-    l_->debug(sstrfmt("| role_ == srv_role::leader -> %d").fmt(role_ == srv_role::leader));
-    l_->debug(sstrfmt("| peers_.empty()            -> %d").fmt(peers_.empty()));
-    l_->debug("====== TRACE END");
-
     if (role_ == srv_role::leader && !peers_.empty() &&
         time_elapsed_since_quorum_resp > ctx_->params_->election_timeout_upper_bound_ * 2) {
 
@@ -576,8 +570,7 @@ ptr<resp_msg> raft_server::handle_add_srv_req(req_msg &req) {
     }
 
     conf_to_add_ = std::move(srv_conf);
-    timer_task<peer &>::executor exec = (timer_task<peer &>::executor) std::bind(&raft_server::handle_hb_timeout, this,
-                                                                                 std::placeholders::_1);
+    auto exec = (timer_task<peer &>::executor) std::bind(&raft_server::handle_hb_timeout, this, std::placeholders::_1);
     srv_to_join_ = cs_new<peer, ptr<srv_config> &, context &, timer_task<peer &>::executor &>(conf_to_add_, *ctx_,
                                                                                               exec);
     invite_srv_to_join_cluster();

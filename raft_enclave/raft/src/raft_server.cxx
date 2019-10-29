@@ -634,9 +634,14 @@ void raft_server::sync_log_to_new_srv(ulong start_idx) {
 }
 
 void raft_server::invite_srv_to_join_cluster() {
-    ptr<req_msg> req(
-            cs_new<req_msg>(state_->get_term(), msg_type::join_cluster_request, id_, srv_to_join_->get_id(), 0L,
-                            log_store_->next_slot() - 1, quick_commit_idx_));
+    ptr<req_msg> req = cs_new<req_msg>(state_->get_term(),
+                                       msg_type::join_cluster_request,
+                                       id_,
+                                       srv_to_join_->get_id(),
+                                       0L,
+                                       log_store_->next_slot() - 1,
+                                       quick_commit_idx_);
+
     req->log_entries().push_back(cs_new<log_entry>(state_->get_term(), config_->serialize(), log_val_type::conf));
     srv_to_join_->send_req(req, ex_resp_handler_);
 }

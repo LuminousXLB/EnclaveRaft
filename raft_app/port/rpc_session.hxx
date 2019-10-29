@@ -62,14 +62,19 @@ public:
 public:
     void start() {
         auto remote = socket_.remote_endpoint();
-        auto local = socket_.local_endpoint();
-
-        logger_->info("connect to {}:{} from {}:{}",
-                      remote.address().to_string(), remote.port(), local.address().to_string(), local.port());
+        logger_->info("connection from {}:{}", remote.address().to_string(), remote.port());
 
         shared_ptr<rpc_session> self = shared_from_this(); // this is safe since we only expose ctor to cs_new
 
-        asio::read(socket_, asio::buffer(&data_size, sizeof(uint32_t)));
+        asio::error_code err;
+        asio::read(socket_, asio::buffer(&data_size, sizeof(uint32_t)), err);
+        if (err == asio::error::eof) {
+            this->stop();
+            return;
+        } else if (err) {
+            logger_->error("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, err.message());
+        }
+
         if (data_size < 0 || data_size > 0x1000000) {
             logger_->warn(
                     "bad log data size in the header {}, stop this session to protect further corruption",
@@ -84,7 +89,7 @@ public:
         }
 
         message_buffer.resize((size_t) data_size);
-        logger_->debug("{}: data_size = {}", __FILE__, data_size);
+        logger_->debug("{} {} {}: data_size = {}", __FILE__, __FUNCTION__, __LINE__, data_size);
 
         asio::async_read(this->socket_,
                          asio::buffer(message_buffer),
@@ -115,7 +120,7 @@ private:
     void read_complete() {
         shared_ptr<rpc_session> self = this->shared_from_this();
 
-        logger_->debug("{}: req read = {}", __FILE__, spdlog::to_hex(message_buffer));
+        logger_->debug("{} {}: read = {}", __FILE__, __LINE__, spdlog::to_hex(message_buffer));
 
         auto resp_buf = handler_(message_buffer);
         uint32_t length = resp_buf->size();

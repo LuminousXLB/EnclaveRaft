@@ -39,6 +39,8 @@ extern sgx_enclave_id_t global_enclave_id;
 
 
 shared_ptr<vector<uint8_t >> message_handler(const vector<uint8_t> &message) {
+    spdlog::debug("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, message.size());
+
     uint32_t uid;
     int32_t resp_len;
     ecall_handle_rpc_request(global_enclave_id, &resp_len, message.size(), message.data(), &uid);

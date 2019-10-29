@@ -30,10 +30,11 @@ static atomic<uint32_t> id_counter;
 static map<uint32_t, bufptr> message_buffer;
 
 int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t *msg_id) {
+    ocall_puts(lstrfmt("\t%s %s %d: %u").fmt(__FILE__, __FUNCTION__, __LINE__, size));
+
     // FIXME: Encrypt & Decrypt
     bufptr header = buffer::alloc(RPC_REQ_HEADER_SIZE);
     memcpy_s(header->data(), header->size(), message, RPC_REQ_HEADER_SIZE);
-
     header->pos(RPC_REQ_HEADER_SIZE - 4);
     int32 data_size = header->get_int();
 
@@ -42,6 +43,7 @@ int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t
 
     try {
         header->pos(0);
+
         auto t = (msg_type) header->get_byte();
         int32 src = header->get_int();
         int32 dst = header->get_int();
@@ -100,14 +102,14 @@ int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t
 }
 
 bool ecall_fetch_rpc_response(uint32_t msg_id, uint32_t buffer_size, uint8_t *buffer) {
-    {
-        lock_guard<mutex> lock(message_buffer_lock);
-        auto it = message_buffer.find(msg_id);
-        if (it == message_buffer.end()) {
-            return false;
-        } else {
-            memcpy_s(buffer, buffer_size, it->second->data(), it->second->size());
-            return true;
-        }
+    ocall_puts(lstrfmt("\t%s %s %d: %u").fmt(__FILE__, __FUNCTION__, __LINE__, msg_id));
+
+    lock_guard<mutex> lock(message_buffer_lock);
+    auto it = message_buffer.find(msg_id);
+    if (it == message_buffer.end()) {
+        return false;
+    } else {
+        memcpy_s(buffer, buffer_size, it->second->data(), it->second->size());
+        return true;
     }
 }
