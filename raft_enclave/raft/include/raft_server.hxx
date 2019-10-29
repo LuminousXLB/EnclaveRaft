@@ -148,9 +148,7 @@ namespace cornerstone {
     __nocopy__(raft_server)
 
     public:
-        ptr<logger> get_logger() {
-            return l_;
-        }
+        ptr<logger> get_logger();
 
         ptr<resp_msg> process_req(req_msg &req);
 

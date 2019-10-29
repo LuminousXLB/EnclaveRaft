@@ -18,7 +18,7 @@ shared_ptr<spdlog::logger> global_logger;
 int main(int argc, char const *argv[]) {
 
     global_io_context = make_shared<asio::io_context>();
-    global_logger = spdlog::stderr_color_mt("raft");
+    global_logger = spdlog::stdout_color_mt("raft");
     global_logger->info("init");
 
     /* Enclave Initialization */
@@ -46,6 +46,8 @@ int main(int argc, char const *argv[]) {
         });
         t.detach();
     }
+
+    global_logger->info("Exiting ...");
 
     return 0;
 }
