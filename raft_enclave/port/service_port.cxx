@@ -8,7 +8,6 @@ map<uint64_t, function<void(bool)>> service_task_pool;
 mutex service_task_pool_lock;
 
 
-// TODO: log this into edl
 void ecall_timer_expired_callback(uint64_t task_uid, bool success) {
     map<uint64_t, function<void(bool)>>::iterator callback;
 

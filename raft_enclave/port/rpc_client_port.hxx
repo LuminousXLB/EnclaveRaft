@@ -34,6 +34,7 @@ using cornerstone::lstrfmt;
 using callback_item = pair<ptr<req_msg>, rpc_handler>;
 extern map<uint64_t, callback_item> rpc_client_callback_pool;
 extern mutex rpc_client_callback_pool_lock;
+extern atomic<uint32_t> last_req_uid_;
 
 static uint32_t rpc_client_create(const string &endpoint) {
     uint32_t ret_val;
@@ -44,10 +45,17 @@ static uint32_t rpc_client_create(const string &endpoint) {
 
 class RpcClientPort : public rpc_client {
 public:
-    explicit RpcClientPort(const string &endpoint) : client_uid_(rpc_client_create(endpoint)),
-                                                     last_req_uid_(0) {}
+    explicit RpcClientPort(const string &endpoint) : client_uid_(rpc_client_create(endpoint)) {}
 
     ~RpcClientPort() override {
+        {
+            lock_guard<mutex> lock(rpc_client_callback_pool_lock);
+            auto it = rpc_client_callback_pool.find(client_uid_);
+            if (it != rpc_client_callback_pool.end()) {
+                rpc_client_callback_pool.erase(it);
+            }
+        }
+
         ocall_rpc_client_close(client_uid_);
     }
 
@@ -101,7 +109,6 @@ private:
     }
 
     uint32_t client_uid_;
-    atomic<uint32_t> last_req_uid_;
 };
 
 

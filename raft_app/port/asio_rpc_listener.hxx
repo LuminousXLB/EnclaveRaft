@@ -38,7 +38,7 @@ using std::enable_shared_from_this;
 extern sgx_enclave_id_t global_enclave_id;
 
 
-shared_ptr<vector<uint8_t >> message_handler(const vector<uint8_t> &message) {
+shared_ptr<vector<uint8_t>> message_handler(const vector<uint8_t> &message) {
     spdlog::debug("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, message.size());
 
     uint32_t uid;
@@ -51,7 +51,9 @@ shared_ptr<vector<uint8_t >> message_handler(const vector<uint8_t> &message) {
 
     auto buffer = make_shared<vector<uint8_t >>(resp_len, 0);
     bool ret;
+    spdlog::debug("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, "Before ecall_fetch_rpc_response");
     ecall_fetch_rpc_response(global_enclave_id, &ret, uid, buffer->size(), &(*buffer)[0]);
+    spdlog::debug("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, "After ecall_fetch_rpc_response");
     if (ret) {
         return buffer;
     } else {

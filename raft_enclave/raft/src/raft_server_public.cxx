@@ -19,8 +19,6 @@
 
 using namespace cornerstone;
 
-extern const char *__msg_type_str[];
-
 
 ptr<logger> raft_server::get_logger() {
     return l_;
@@ -29,9 +27,9 @@ ptr<logger> raft_server::get_logger() {
 ptr<resp_msg> raft_server::process_req(req_msg &req) {
     recur_lock(lock_);
     l_->debug(
-            lstrfmt("Receive a %s message from %d with LastLogIndex=%llu, LastLogTerm=%llu, EntriesLength=%d, CommitIndex=%llu and Term=%llu")
-                    .fmt(__msg_type_str[req.get_type()],
-                         req.get_src(),
+            lstrfmt("Request from %d -> [%s] with LastLogIndex=%llu, LastLogTerm=%llu, EntriesLength=%d, CommitIndex=%llu and Term=%llu")
+                    .fmt(req.get_src(),
+                         msg_type_string(req.get_type()),
                          req.get_last_log_idx(),
                          req.get_last_log_term(),
                          req.log_entries().size(),
@@ -64,9 +62,9 @@ ptr<resp_msg> raft_server::process_req(req_msg &req) {
     }
 
     if (resp) {
-        l_->debug(lstrfmt("Response back a %s message to %d with Accepted=%d, Term=%llu, NextIndex=%llu")
-                          .fmt(__msg_type_str[resp->get_type()],
-                               resp->get_dst(),
+        l_->debug(lstrfmt("Response back to %d <- [%s] with Accepted=%d, Term=%llu, NextIndex=%llu")
+                          .fmt(resp->get_dst(),
+                               msg_type_string(resp->get_type()),
                                resp->get_accepted() ? 1 : 0,
                                resp->get_term(),
                                resp->get_next_idx()));

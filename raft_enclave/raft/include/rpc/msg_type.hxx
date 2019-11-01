@@ -38,6 +38,8 @@ namespace cornerstone {
         install_snapshot_request,
         install_snapshot_response
     };
+
+    const char *msg_type_string(msg_type type);
 }
 
 #endif //_MESSAGE_TYPE_HXX_

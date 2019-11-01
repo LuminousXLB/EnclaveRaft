@@ -29,6 +29,12 @@ int main() {
 
     uint16_t leader_id = 1;
     leader_id = add_server(io_context, leader_id, 2);
+
+    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(200));
+
     leader_id = add_server(io_context, leader_id, 3);
-    leader_id = client_request(io_context, leader_id, "Hello");
+
+    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(200));
+//
+//    leader_id = client_request(io_context, leader_id, "Hello");
 }

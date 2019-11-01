@@ -61,11 +61,7 @@ namespace cornerstone {
         * @param end, the end index of log entries (exclusive)
         * @return the log entries between [start, end), nilptr is returned if no entries in that range
         */
-        virtual ptr<std::vector<ptr<log_entry>>>
-        log_entries(ulong
-                    start,
-                    ulong end
-        ) = 0;
+        virtual ptr<std::vector<ptr<log_entry>>> log_entries(ulong start, ulong end) = 0;
 
         /**
         * Gets the log entry at the specified index
