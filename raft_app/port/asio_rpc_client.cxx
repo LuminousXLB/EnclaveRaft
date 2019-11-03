@@ -28,8 +28,11 @@ static mutex rpc_client_pool_lock;
 static atomic<uint32_t> rpc_client_id_counter;
 static map<uint32_t, shared_ptr<asio_rpc_client>> rpc_client_pool;
 
+#define __SLEEP__ std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(10))
 
 uint32_t ocall_rpc_client_create(const char *endpoint) {
+    __SLEEP__;
+
     // the endpoint is expecting to be protocol://host:port, and we only support tcp for this factory
     // which is endpoint must be tcp://hostname:port
 
@@ -57,6 +60,8 @@ uint32_t ocall_rpc_client_create(const char *endpoint) {
 }
 
 void ocall_rpc_client_close(uint32_t client_uid) {
+    __SLEEP__;
+
     global_logger->debug("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, client_uid);
 
     lock_guard<mutex> lock(rpc_client_pool_lock);
@@ -67,7 +72,9 @@ void ocall_rpc_client_close(uint32_t client_uid) {
 }
 
 void ocall_send_rpc_request(uint32_t client_uid, uint32_t size, const uint8_t *message, uint32_t request_uid) {
-    global_logger->debug("{} {} {}: client={}, request={}, data_size {}", __FILE__, __FUNCTION__, __LINE__,
+    __SLEEP__;
+
+    global_logger->debug("{} {} {}: client={}, request={}, req_size {}", __FILE__, __FUNCTION__, __LINE__,
                          client_uid, request_uid, size);
     global_logger->debug("{} {} {}: client={}, request={}, send {}", __FILE__, __FUNCTION__, __LINE__,
                          client_uid, request_uid, spdlog::to_hex(message, message + size));

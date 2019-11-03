@@ -27,9 +27,9 @@ ptr<logger> raft_server::get_logger() {
 ptr<resp_msg> raft_server::process_req(req_msg &req) {
     recur_lock(lock_);
     l_->debug(
-            lstrfmt("Request from %d -> [%s] with LastLogIndex=%llu, LastLogTerm=%llu, EntriesLength=%d, CommitIndex=%llu and Term=%llu")
-                    .fmt(req.get_src(),
-                         msg_type_string(req.get_type()),
+            lstrfmt("[%s] from %d -> REQUEST with LastLogIndex=%llu, LastLogTerm=%llu, EntriesLength=%d, CommitIndex=%llu and Term=%llu")
+                    .fmt(msg_type_string(req.get_type()),
+                         req.get_src(),
                          req.get_last_log_idx(),
                          req.get_last_log_term(),
                          req.log_entries().size(),
@@ -48,7 +48,6 @@ ptr<resp_msg> raft_server::process_req(req_msg &req) {
         }
     }
 
-
     ptr<resp_msg> resp;
     if (req.get_type() == msg_type::append_entries_request) {
         resp = handle_append_entries(req);
@@ -62,9 +61,9 @@ ptr<resp_msg> raft_server::process_req(req_msg &req) {
     }
 
     if (resp) {
-        l_->debug(lstrfmt("Response back to %d <- [%s] with Accepted=%d, Term=%llu, NextIndex=%llu")
-                          .fmt(resp->get_dst(),
-                               msg_type_string(resp->get_type()),
+        l_->debug(lstrfmt("[%s] to %d <- RESPONSE with Accepted=%d, Term=%llu, NextIndex=%llu")
+                          .fmt(msg_type_string(resp->get_type()),
+                               resp->get_dst(),
                                resp->get_accepted() ? 1 : 0,
                                resp->get_term(),
                                resp->get_next_idx()));
@@ -74,9 +73,9 @@ ptr<resp_msg> raft_server::process_req(req_msg &req) {
 }
 
 ptr<async_result<bool>> raft_server::add_srv(const srv_config &srv) {
-    bufptr buf(srv.serialize());
-    ptr<log_entry> log(cs_new<log_entry>(0, std::move(buf), log_val_type::cluster_server));
-    ptr<req_msg> req(cs_new<req_msg>((ulong) 0, msg_type::add_server_request, 0, 0, (ulong) 0, (ulong) 0, (ulong) 0));
+    bufptr buf = srv.serialize();
+    ptr<log_entry> log = cs_new<log_entry>(0, std::move(buf), log_val_type::cluster_server);
+    ptr<req_msg> req = cs_new<req_msg>((ulong) 0, msg_type::add_server_request, 0, 0, (ulong) 0, (ulong) 0, (ulong) 0);
     req->log_entries().push_back(log);
     return send_msg_to_leader(req);
 }
@@ -100,9 +99,14 @@ ptr<async_result<bool>> raft_server::remove_srv(const int srv_id) {
     bufptr buf(buffer::alloc(sz_int));
     buf->put(srv_id);
     buf->pos(0);
-    ptr<log_entry> log(cs_new<log_entry>(0, std::move(buf), log_val_type::cluster_server));
-    ptr<req_msg> req(
-            cs_new<req_msg>((ulong) 0, msg_type::remove_server_request, 0, 0, (ulong) 0, (ulong) 0, (ulong) 0));
+    ptr<log_entry> log = cs_new<log_entry>(0, std::move(buf), log_val_type::cluster_server);
+    ptr<req_msg> req = cs_new<req_msg>((ulong) 0,
+                                       msg_type::remove_server_request,
+                                       0,
+                                       0,
+                                       (ulong) 0,
+                                       (ulong) 0,
+                                       (ulong) 0);
     req->log_entries().push_back(log);
     return send_msg_to_leader(req);
 }

@@ -62,11 +62,31 @@ bufptr send(asio::io_context &io_ctx, uint16_t port, const bufptr &req_buf) {
     tcp::resolver resolver(io_ctx);
     asio::connect(s, resolver.resolve("127.0.0.1", std::to_string(port)));
 
-    asio::write(s, asio::buffer(&size, sizeof(uint32_t)));
-    asio::write(s, asio::buffer(req_buf->data(), req_buf->size()));
+    auto local = s.local_endpoint();
+    auto remote = s.remote_endpoint();
+    spdlog::info("Socket Local {}:{} -> Remote {}:{}",
+                 local.address().to_string(), local.port(), remote.address().to_string(), remote.port());
 
-    asio::read(s, asio::buffer(&size, sizeof(uint32_t)));
-    size_t reply_length = asio::read(s, asio::buffer(resp_buf->data(), resp_buf->size()));
+    asio::error_code err;
+    asio::write(s, asio::buffer(&size, sizeof(uint32_t)), err);
+    if (err) {
+        spdlog::error("Error when writing header: {}", err.message());
+    }
+
+    asio::write(s, asio::buffer(req_buf->data(), req_buf->size()), err);
+    if (err) {
+        spdlog::error("Error when writing message: {}", err.message());
+    }
+
+    asio::read(s, asio::buffer(&size, sizeof(uint32_t)), err);
+    if (err) {
+        spdlog::error("Error when reading header: {}", err.message());
+    }
+
+    size_t reply_length = asio::read(s, asio::buffer(resp_buf->data(), resp_buf->size()), err);
+    if (err) {
+        spdlog::error("Error when reading message: {}", err.message());
+    }
 
     spdlog::info("Fetched reply from {}: {}", port, reply_length);
 
@@ -94,6 +114,6 @@ uint16_t send_message(asio::io_context &io_ctx, uint16_t dst, msg_type type, con
         resp = deserialize_resp(send(io_ctx, 9000 + dst, serialize_req(req)));
     }
 
-    spdlog::info("Request accepted = {}", resp->get_accepted());
+    spdlog::info("Current Leader = {}, Request accepted = {}", dst, resp->get_accepted());
     return dst;
 }

@@ -105,12 +105,15 @@ ptr<resp_msg> raft_server::handle_append_entries(req_msg &req) {
 }
 
 ptr<resp_msg> raft_server::handle_vote_req(req_msg &req) {
-    ptr<resp_msg> resp(cs_new<resp_msg>(state_->get_term(), msg_type::request_vote_response, id_, req.get_src()));
+    ptr<resp_msg> resp = cs_new<resp_msg>(state_->get_term(), msg_type::request_vote_response, id_, req.get_src());
+
     bool log_okay = req.get_last_log_term() > log_store_->last_entry()->get_term() ||
                     (req.get_last_log_term() == log_store_->last_entry()->get_term() &&
                      log_store_->next_slot() - 1 <= req.get_last_log_idx());
+
     bool grant = req.get_term() == state_->get_term() && log_okay &&
                  (state_->get_voted_for() == req.get_src() || state_->get_voted_for() == -1);
+
     if (grant) {
         resp->accept(log_store_->next_slot());
         state_->set_voted_for(req.get_src());
@@ -204,7 +207,7 @@ ptr<resp_msg> raft_server::handle_add_srv_req(req_msg &req) {
         return resp;
     }
 
-    ptr<srv_config> srv_conf(srv_config::deserialize(entries[0]->get_buf()));
+    ptr<srv_config> srv_conf = srv_config::deserialize(entries[0]->get_buf());
     if (peers_.find(srv_conf->get_id()) != peers_.end() || id_ == srv_conf->get_id()) {
         l_->warn(lstrfmt("the server to be added has a duplicated id with existing server %d").fmt(srv_conf->get_id()));
         return resp;
@@ -287,7 +290,8 @@ ptr<resp_msg> raft_server::handle_log_sync_req(req_msg &req) {
 
 ptr<resp_msg> raft_server::handle_join_cluster_req(req_msg &req) {
     std::vector<ptr<log_entry>> &entries = req.log_entries();
-    ptr<resp_msg> resp(cs_new<resp_msg>(state_->get_term(), msg_type::join_cluster_response, id_, req.get_src()));
+    ptr<resp_msg> resp = cs_new<resp_msg>(state_->get_term(), msg_type::join_cluster_response, id_, req.get_src());
+
     if (entries.size() != 1 || entries[0]->get_val_type() != log_val_type::conf) {
         l_->info("receive an invalid JoinClusterRequest as the log entry value doesn't meet the requirements");
         return resp;
@@ -306,8 +310,10 @@ ptr<resp_msg> raft_server::handle_join_cluster_req(req_msg &req) {
     state_->set_voted_for(-1);
     state_->set_term(req.get_term());
     ctx_->state_mgr_->save_state(*state_);
+
     reconfigure(cluster_config::deserialize(entries[0]->get_buf()));
     resp->accept(log_store_->next_slot());
+
     return resp;
 }
 

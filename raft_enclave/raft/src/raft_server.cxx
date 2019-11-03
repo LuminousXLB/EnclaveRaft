@@ -23,7 +23,7 @@ using namespace cornerstone;
 const int raft_server::default_snapshot_sync_block_size = 4 * 1024;
 
 void raft_server::request_vote() {
-    l_->info(sstrfmt("requestVote started with term %llu").fmt(state_->get_term()));
+    l_->info(sstrfmt("requestVote started with term %llu (%016llx)").fmt(state_->get_term(), state_->get_term()));
     state_->set_voted_for(id_);
     ctx_->state_mgr_->save_state(*state_);
     votes_granted_ += 1;
@@ -37,9 +37,13 @@ void raft_server::request_vote() {
     }
 
     for (peer_itor it = peers_.begin(); it != peers_.end(); ++it) {
-        ptr<req_msg> req(cs_new<req_msg>(state_->get_term(), msg_type::request_vote_request, id_, it->second->get_id(),
-                                         term_for_log(log_store_->next_slot() - 1), log_store_->next_slot() - 1,
-                                         quick_commit_idx_));
+        ptr<req_msg> req = cs_new<req_msg>(state_->get_term(),
+                                           msg_type::request_vote_request,
+                                           id_,
+                                           it->second->get_id(),
+                                           term_for_log(log_store_->next_slot() - 1),
+                                           log_store_->next_slot() - 1,
+                                           quick_commit_idx_);
         l_->debug(sstrfmt("send %s to server %d with term %llu")
                           .fmt(msg_type_string(req->get_type()),
                                it->second->get_id(),
@@ -126,25 +130,45 @@ void raft_server::enable_hb_for_peer(peer &p) {
 }
 
 void raft_server::become_follower() {
+    l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     // stop hb for all peers
     for (peer_itor it = peers_.begin(); it != peers_.end(); ++it) {
         it->second->enable_hb(false);
     }
 
+    l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     srv_to_join_.reset();
     role_ = srv_role::follower;
+
+    l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     restart_election_timer();
+
+    l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
 }
 
 bool raft_server::update_term(ulong term) {
+    l_->info(lstrfmt("||| COME TO HERE -> %s %s %d -> %016x").fmt(__FILE__, __FUNCTION__, __LINE__, term));
+
     if (term > state_->get_term()) {
         state_->set_term(term);
         state_->set_voted_for(-1);
         election_completed_ = false;
+
+        l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
+
         votes_granted_ = 0;
         voted_servers_.clear();
         ctx_->state_mgr_->save_state(*state_);
+
+        l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
+
         become_follower();
+
+        l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
+
         return true;
     }
 
@@ -328,14 +352,16 @@ ptr<req_msg> raft_server::create_append_entries_req(peer &p) {
 }
 
 void raft_server::reconfigure(const ptr<cluster_config> &new_config) {
-    l_->debug(
-            lstrfmt("system is reconfigured to have %d servers, last config index: %llu, this config index: %llu")
-                    .fmt(new_config->get_servers().size(), new_config->get_prev_log_idx(), new_config->get_log_idx()));
-
     // we only allow one server to be added or removed at a time
-    std::vector<int32> srvs_removed;
+
+    l_->debug(lstrfmt("system is reconfigured to have %d servers, last config index: %llu, this config index: %llu")
+                      .fmt(new_config->get_servers().size(),
+                           new_config->get_prev_log_idx(),
+                           new_config->get_log_idx()));
+
+    // `srvs_added` <- find the servers in `new_config` but not in `peers_` and not myself
     std::vector<ptr<srv_config>> srvs_added;
-    std::list<ptr<srv_config>> &new_srvs(new_config->get_servers());
+    std::list<ptr<srv_config>> &new_srvs = new_config->get_servers();
     for (std::list<ptr<srv_config>>::const_iterator it = new_srvs.begin(); it != new_srvs.end(); ++it) {
         peer_itor pit = peers_.find((*it)->get_id());
         if (pit == peers_.end() && id_ != (*it)->get_id()) {
@@ -343,25 +369,37 @@ void raft_server::reconfigure(const ptr<cluster_config> &new_config) {
         }
     }
 
+    // `srvs_removed` <- find the servers in `new_srvs` but not in `peers_` and not myself
+    std::vector<int32> srvs_removed;
     for (peer_itor it = peers_.begin(); it != peers_.end(); ++it) {
         if (!new_config->get_server(it->first)) {
             srvs_removed.push_back(it->first);
         }
     }
 
+    // check if myself in new_config
     if (!new_config->get_server(id_)) {
         srvs_removed.push_back(id_);
     }
 
+    // add servers
     for (std::vector<ptr<srv_config>>::const_iterator it = srvs_added.begin(); it != srvs_added.end(); ++it) {
+        // construct srv_config
         ptr<srv_config> srv_added(*it);
-        timer_task<peer &>::executor exec = (timer_task<peer &>::executor) std::bind(&raft_server::handle_hb_timeout,
-                                                                                     this, std::placeholders::_1);
+
+        // construct timeout_handler
+        auto exec = (timer_task<peer &>::executor) std::bind(&raft_server::handle_hb_timeout, this,
+                                                             std::placeholders::_1);
+
+        // construct peer
         ptr<peer> p = cs_new<peer, ptr<srv_config> &, context &, timer_task<peer &>::executor &>(srv_added, *ctx_,
                                                                                                  exec);
         p->set_next_log_idx(log_store_->next_slot());
+
+        // insert the peer
         peers_.insert(std::make_pair(srv_added->get_id(), p));
         l_->info(sstrfmt("server %d is added to cluster").fmt(srv_added->get_id()));
+
         if (role_ == srv_role::leader) {
             l_->info(sstrfmt("enable heartbeating for server %d").fmt(srv_added->get_id()));
             enable_hb_for_peer(*p);
@@ -372,6 +410,7 @@ void raft_server::reconfigure(const ptr<cluster_config> &new_config) {
         }
     }
 
+    // remove servers
     for (std::vector<int32>::const_iterator it = srvs_removed.begin(); it != srvs_removed.end(); ++it) {
         int32 srv_removed = *it;
         if (srv_removed == id_ && !catching_up_) {
@@ -442,7 +481,24 @@ void raft_server::invite_srv_to_join_cluster() {
                                        log_store_->next_slot() - 1,
                                        quick_commit_idx_);
 
-    req->log_entries().push_back(cs_new<log_entry>(state_->get_term(), config_->serialize(), log_val_type::conf));
+    {
+        l_->debug(lstrfmt("%s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
+        string srvs;
+        for (const auto &server: config_->get_servers()) {
+            srvs += server->get_endpoint();
+            srvs += " ";
+        }
+        l_->debug(srvs);
+    }
+
+#if 0
+    ptr<cluster_config> c_conf = get_config();
+    req->log_entries().push_back(cs_new<log_entry>(state_->get_term(), c_conf->serialize(), log_val_type::conf));
+    srv_to_join_->send_req(srv_to_join_, req, ex_resp_handler_);
+    p_in("sent join request to peer %d, %s", srv_to_join_->get_id(), srv_to_join_->get_endpoint().c_str());
+#endif
+    ptr<log_entry> entry = cs_new<log_entry>(state_->get_term(), config_->serialize(), log_val_type::conf);
+    req->log_entries().push_back(entry);
     srv_to_join_->send_req(req, ex_resp_handler_);
 }
 

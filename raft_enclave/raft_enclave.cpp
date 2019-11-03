@@ -27,10 +27,10 @@ using raft_app_context  = pair<shared_ptr<raft_server>, shared_ptr<rpc_listener>
 
 static shared_ptr<raft_server> g_server = nullptr;
 static shared_ptr<rpc_listener> g_listener = nullptr;
-
+shared_ptr<logger> p_logger;
 
 raft_app_context run_raft_instance(int srv_id, const string &endpoint, uint16_t port) {
-    shared_ptr<logger> p_logger = make_shared<LoggerPort>();
+    p_logger = make_shared<LoggerPort>();
 
     shared_ptr<rpc_listener> p_listener = make_shared<RpcListenerPort>(port);
     shared_ptr<state_mgr> p_manager = make_shared<in_memory_state_mgr>(srv_id, endpoint);

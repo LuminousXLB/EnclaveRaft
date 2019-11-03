@@ -28,6 +28,8 @@
 #include "rpc/rpc_client_interface.hxx"
 #include "context.hxx"
 
+extern std::shared_ptr<cornerstone::logger> p_logger;
+
 namespace cornerstone {
     class peer {
     public:
@@ -147,17 +149,37 @@ namespace cornerstone {
         }
 
         void send_req(ptr<req_msg> &req, rpc_handler &handler) {
+            p_logger->debug(
+                    lstrfmt("[%s] to %d <- REQUEST with LastLogIndex=%llu, LastLogTerm=%llu, EntriesLength=%d, CommitIndex=%llu and Term=%llu")
+                            .fmt(msg_type_string(req->get_type()),
+                                 req->get_src(),
+                                 req->get_last_log_idx(),
+                                 req->get_last_log_term(),
+                                 req->log_entries().size(),
+                                 req->get_commit_idx(),
+                                 req->get_term()));
+
             ptr<rpc_result> pending = cs_new<rpc_result>(handler);
+
+            p_logger->debug(lstrfmt("%s %s %d: req_type=%d").fmt(__FILE__, __FUNCTION__, __LINE__, req->get_type()));
+
             rpc_handler h = (rpc_handler) std::bind(
                     &peer::handle_rpc_result,
                     this, req, pending, std::placeholders::_1, std::placeholders::_2
             );
+
+            p_logger->debug(lstrfmt("%s %s %d: req_type=%d").fmt(__FILE__, __FUNCTION__, __LINE__, req->get_type()));
+
             rpc_->send(req, h);
+
+            p_logger->debug(lstrfmt("%s %s %d: req_type=%d").fmt(__FILE__, __FUNCTION__, __LINE__, req->get_type()));
+
         }
 
     private:
         void handle_rpc_result(ptr<req_msg> &req, ptr<rpc_result> &pending_result, ptr<resp_msg> &resp,
                                const ptr<rpc_exception> &err) {
+
             if (err == nilptr) {
                 if (req->get_type() == msg_type::append_entries_request ||
                     req->get_type() == msg_type::install_snapshot_request) {

@@ -64,22 +64,37 @@ public:
             tcp_resolver::query q(host_, port_, tcp_resolver::query::all_matching);
             resolver_.async_resolve(
                     q,
-                    [self, this, request_uid, msg_buf](asio::error_code err,
-                                                       tcp_resolver::iterator iter) -> void {
+                    [self, this, request_uid, msg_buf](asio::error_code err, tcp_resolver::iterator iter) -> void {
                         if (!err) {
-                            asio::async_connect(socket_, std::move(iter),
-                                                std::bind(&asio_rpc_client::connected, self,
+                            asio::async_connect(socket_,
+                                                std::move(iter),
+                                                std::bind(&asio_rpc_client::connected,
+                                                          self,
                                                           request_uid,
                                                           msg_buf,
                                                           std::placeholders::_1,
                                                           std::placeholders::_2));
                         } else {
-                            string e = fmt::format("failed to resolve host {} due to error {}", host_, err.value());
+                            string e = fmt::format("failed to resolve host {} due to error [{}] {}",
+                                                   host_, err.value(), err.message());
                             ecall_rpc_response(global_enclave_id, request_uid, 0, nullptr, e.c_str());
                         }
                     }
             );
         } else {
+            // this part is for log
+            auto remote_addr = fmt::format("{}:{}",
+                                           socket_.remote_endpoint().address().to_string(),
+                                           socket_.remote_endpoint().port());
+            auto local_addr = fmt::format("{}:{}",
+                                          socket_.local_endpoint().address().to_string(),
+                                          socket_.local_endpoint().port());
+            // this part is for log
+
+            global_logger->debug("{} {} {}: req_size {}", __FILE__, __FUNCTION__, __LINE__, size);
+            global_logger->debug("{} {} {}: {} -> {} send {}", __FILE__, __FUNCTION__, __LINE__,
+                                 local_addr, remote_addr, spdlog::to_hex(message, message + size));
+
             asio::write(socket_, asio::buffer(&size, sizeof(int32_t)));
             asio::async_write(
                     socket_,
@@ -97,33 +112,56 @@ private:
         if (!err) {
             this->send(request_uid, msg_buf->data(), msg_buf->size());
         } else {
-            string e = fmt::format("failed to connect to remote socket due to error %d", err.value());
+            string e = fmt::format("failed to send request to remote socket due to error [{}] {}",
+                                   err.value(), err.message());
             ecall_rpc_response(global_enclave_id, request_uid, 0, nullptr, e.c_str());
         }
     }
 
     void sent(uint32_t request_uid, asio::error_code err, size_t bytes_transferred) {
+        global_logger->debug("{} {} {}: client={}, TRACE", __FILE__, __FUNCTION__, __LINE__, client_uid_);
+
+        shared_ptr<asio_rpc_client> self = this->shared_from_this();
+
+        global_logger->debug("{} {} {}: client={}, TRACE", __FILE__, __FUNCTION__, __LINE__, client_uid_);
+
         if (!err) {
             // read a response
             int32_t data_size;
 
             asio::error_code ec;
-            asio::read(socket_, asio::buffer(&data_size, sizeof(uint32_t)), ec);
-            if (ec == asio::error::eof) {
+            do {
+                asio::read(socket_, asio::buffer(&data_size, sizeof(uint32_t)), ec);
+            } while (ec == asio::error::eof);
+
+            if (ec) {
+                global_logger->error("Error read response: {}", ec.message());
                 socket_.close();
                 return;
             }
 
+            global_logger->debug("{} {} {}: client={}, TRACE", __FILE__, __FUNCTION__, __LINE__, client_uid_);
+
             auto message_buffer = make_shared<vector<uint8_t>>(data_size, 0);
 
-            asio::async_read(this->socket_,
-                             asio::buffer(*message_buffer),
-                             [this, request_uid, message_buffer](asio::error_code err, size_t bytes_read) {
-                                 this->response_read(request_uid, message_buffer, err, bytes_read);
-                             }
-            );
+            size_t br;
+
+            do {
+                br = asio::read(socket_, asio::buffer(*message_buffer), ec);
+            } while (br == asio::error::eof);
+
+            response_read(request_uid, message_buffer, ec, br);
+            // FIXME: async read
+//            asio::async_read(socket_,
+//                             asio::buffer(*message_buffer),
+//                             [self, request_uid, message_buffer](asio::error_code err,
+//                                                                  size_t bytes_read) mutable -> void {
+//                                 self->response_read(request_uid, message_buffer, err, bytes_read);
+//                             }
+//            );
         } else {
-            string e = fmt::format("failed to send request to remote socket due to error %d", err.value());
+            string e = fmt::format("failed to send request to remote socket due to error [{}] {}",
+                                   err.value(), err.message());
             ecall_rpc_response(global_enclave_id, request_uid, 0, nullptr, e.c_str());
             socket_.close();
         }
@@ -131,13 +169,24 @@ private:
 
     void response_read(uint32_t req_uid, const shared_ptr<vector<uint8_t>> &resp, asio::error_code err, size_t _br) {
         if (!err) {
+            auto remote_addr = fmt::format("{}:{}",
+                                           socket_.remote_endpoint().address().to_string(),
+                                           socket_.remote_endpoint().port());
+            auto local_addr = fmt::format("{}:{}",
+                                          socket_.local_endpoint().address().to_string(),
+                                          socket_.local_endpoint().port());
+
             global_logger->debug("{} {} {}: client={}, response={}, resp_size {}", __FILE__, __FUNCTION__, __LINE__,
                                  client_uid_, req_uid, resp->size());
-            global_logger->debug("{} {} {}: client={}, response={}. read {}", __FILE__, __FUNCTION__, __LINE__,
-                                 client_uid_, req_uid, spdlog::to_hex(*resp));
+            global_logger->debug("{} {} {}: local_addr={}, TRACE", __FILE__, __FUNCTION__, __LINE__, local_addr);
+            global_logger->debug("{} {} {}: remote_addr={}, TRACE", __FILE__, __FUNCTION__, __LINE__, remote_addr);
+
+            global_logger->debug("{} {} {}: {} <- {} client={}, response={}. read {}", __FILE__, __FUNCTION__, __LINE__,
+                                 local_addr, remote_addr, client_uid_, req_uid, spdlog::to_hex(*resp));
+
             ecall_rpc_response(global_enclave_id, req_uid, resp->size(), resp->data(), nullptr);
         } else {
-            string e = fmt::format("failed to read response from remote socket due to error :{} -> {}",
+            string e = fmt::format("failed to read response from remote socket due to error [{}] {}",
                                    err.value(), err.message());
             ecall_rpc_response(global_enclave_id, req_uid, 0, nullptr, e.c_str());
             socket_.close();

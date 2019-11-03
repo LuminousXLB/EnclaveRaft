@@ -34,6 +34,7 @@ using std::function;
 
 using spdlog::logger;
 
+#define __SLEEP__ std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(10))
 
 // rpc session
 class rpc_session;
@@ -49,7 +50,8 @@ public:
             : handler_(std::move(handler)),
               socket_(io),
               logger_(logger),
-              callback_(std::forward<SessionCloseCallback>(callback)) {}
+              callback_(std::forward<SessionCloseCallback>(callback)),
+              data_size_(0) {}
 
 
 public:
@@ -62,37 +64,47 @@ public:
 public:
     void start() {
         auto remote = socket_.remote_endpoint();
-        logger_->info("connection from {}:{}", remote.address().to_string(), remote.port());
+        logger_->info("Connection from {}:{}", remote.address().to_string(), remote.port());
 
         shared_ptr<rpc_session> self = shared_from_this(); // this is safe since we only expose ctor to cs_new
 
         asio::error_code err;
-        asio::read(socket_, asio::buffer(&data_size, sizeof(uint32_t)), err);
-        if (err == asio::error::eof) {
+        do {
+            asio::read(socket_, asio::buffer(&data_size_, sizeof(uint32_t)), err);
+        } while (err == asio::error::eof);
+
+        if (err) {
+            {
+                auto local_addr = fmt::format("{}:{}",
+                                              socket_.local_endpoint().address().to_string(),
+                                              socket_.local_endpoint().port());
+
+                logger_->error("{} {} {}: local={} - {}", __FILE__, __FUNCTION__, __LINE__,
+                               local_addr, err.message());
+            }
+
+            exit(-1);
             this->stop();
-            return;
-        } else if (err) {
-            logger_->error("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, err.message());
         }
 
-        if (data_size < 0 || data_size > 0x1000000) {
-            logger_->warn(
-                    "bad log data size in the header {}, stop this session to protect further corruption",
-                    data_size);
+        if (data_size_ < 0 || data_size_ > 0x1000000) {
+            logger_->warn("bad log data size in the header {}, stop this session to protect further corruption",
+                          data_size_);
             this->stop();
             return;
         }
 
-        if (data_size == 0) {
+        if (data_size_ == 0) {
             this->read_complete();
             return;
         }
 
-        message_buffer.resize((size_t) data_size);
-        logger_->debug("{} {} {}: data_size = {}", __FILE__, __FUNCTION__, __LINE__, data_size);
+        message_buffer_.clear();
+        message_buffer_.resize((size_t) data_size_, 0);
+        logger_->debug("{} {} {}: data_size = {}", __FILE__, __FUNCTION__, __LINE__, data_size_);
 
         asio::async_read(this->socket_,
-                         asio::buffer(message_buffer),
+                         asio::buffer(message_buffer_),
                          std::bind(&rpc_session::read_log_data, self, std::placeholders::_1, std::placeholders::_2));
     }
 
@@ -118,36 +130,58 @@ private:
     }
 
     void read_complete() {
+        // this part is for log
+        auto remote_addr = fmt::format("{}:{}",
+                                       socket_.remote_endpoint().address().to_string(),
+                                       socket_.remote_endpoint().port());
+        auto local_addr = fmt::format("{}:{}",
+                                      socket_.local_endpoint().address().to_string(),
+                                      socket_.local_endpoint().port());
+        // this part is for log
+
         shared_ptr<rpc_session> self = this->shared_from_this();
+        logger_->debug("{} {}: {} <- {}  read {}", __FILE__, __LINE__,
+                       local_addr, remote_addr, spdlog::to_hex(message_buffer_));
 
-        logger_->debug("{} {}: read = {}", __FILE__, __LINE__, spdlog::to_hex(message_buffer));
+        try {
+            auto resp_buf = handler_(message_buffer_);
+            uint32_t length = resp_buf->size();
 
-        auto resp_buf = handler_(message_buffer);
-        uint32_t length = resp_buf->size();
+            if (resp_buf) {
+                logger_->debug("{} {} {}: resp_size {}", __FILE__, __FUNCTION__, __LINE__,
+                               resp_buf->size());
+                logger_->debug("{} {} {}: {} -> {} send {}", __FILE__, __FUNCTION__, __LINE__,
+                               local_addr, remote_addr, spdlog::to_hex(*resp_buf));
 
-        if (resp_buf) {
-            asio::write(socket_, asio::buffer(&length, sizeof(length)));
-            asio::async_write(
-                    socket_,
-                    asio::buffer(*resp_buf),
-                    [this, self](asio::error_code err, size_t) -> void {
-                        if (!err) {
-                            data_size = 0;
-                            start();
-                        } else {
-                            logger_->error("failed to send response to peer due to error {}", err.value());
-                            stop();
+                asio::write(socket_, asio::buffer(&length, sizeof(length)));
+                asio::async_write(
+                        socket_,
+                        asio::buffer(*resp_buf),
+                        [this, self](asio::error_code err, size_t) -> void {
+                            if (!err) {
+                                data_size_ = 0;
+                                start();
+                            } else {
+                                logger_->error("failed to send response to peer due to error {}", err.value());
+                                stop();
+                            }
                         }
-                    }
-            );
+                );
+            } else {
+                logger_->error("no response is returned from raft message handler, potential system bug");
+                this->stop();
+            }
+        } catch (std::exception &ex) {
+            logger_->error("failed to process request message due to error: {}", ex.what());
+            this->stop();
         }
     }
 
 private:
     msg_handler handler_;
     asio::ip::tcp::socket socket_;
-    int32_t data_size{};
-    vector<uint8_t> message_buffer;
+    int32_t data_size_;
+    vector<uint8_t> message_buffer_;
     shared_ptr<logger> logger_;
     session_closed_callback callback_;
 };
