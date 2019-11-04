@@ -105,20 +105,35 @@ ptr<resp_msg> raft_server::handle_append_entries(req_msg &req) {
 }
 
 ptr<resp_msg> raft_server::handle_vote_req(req_msg &req) {
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     ptr<resp_msg> resp = cs_new<resp_msg>(state_->get_term(), msg_type::request_vote_response, id_, req.get_src());
+
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
 
     bool log_okay = req.get_last_log_term() > log_store_->last_entry()->get_term() ||
                     (req.get_last_log_term() == log_store_->last_entry()->get_term() &&
                      log_store_->next_slot() - 1 <= req.get_last_log_idx());
 
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     bool grant = req.get_term() == state_->get_term() && log_okay &&
                  (state_->get_voted_for() == req.get_src() || state_->get_voted_for() == -1);
 
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     if (grant) {
+        l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
         resp->accept(log_store_->next_slot());
+
+        l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
         state_->set_voted_for(req.get_src());
+
+        l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
         ctx_->state_mgr_->save_state(*state_);
     }
+
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
 
     return resp;
 }

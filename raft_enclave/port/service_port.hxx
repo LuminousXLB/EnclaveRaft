@@ -66,10 +66,13 @@ __nocopy__(ServicePort)
 private:
     // From delayed_task_scheduler
     void cancel_impl(ptr<delayed_task> &task) override {
-        if (task->get_impl_context() == nilptr) {
+        p_logger->debug(lstrfmt("%s %s %d: TRACE").fmt(__BASE_FILE__, __FUNCTION__, __LINE__));
+
+        if (task->get_impl_context() != nilptr) {
             auto task_uid = static_cast<uint64_t *> (task->get_impl_context());
             ocall_cancel_delayed_task(*task_uid);
         }
+        p_logger->debug(lstrfmt("%s %s %d: TRACE").fmt(__BASE_FILE__, __FUNCTION__, __LINE__));
     }
 
 private:

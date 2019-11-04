@@ -21,9 +21,11 @@
 using namespace cornerstone;
 
 void raft_server::handle_peer_resp(ptr<resp_msg> &resp, const ptr<rpc_exception> &err) {
+    l_->debug(lstrfmt("%s %s %d: CurrentLeader=%d. TRACE").fmt(__FILE__, __FUNCTION__, __LINE__, leader_));
+
     recur_lock(lock_);
     if (err) {
-        l_->info(sstrfmt("peer response error: %s").fmt(err->what()));
+        l_->err(sstrfmt("peer response error: %s").fmt(err->what()));
         return;
     }
 
@@ -37,7 +39,7 @@ void raft_server::handle_peer_resp(ptr<resp_msg> &resp, const ptr<rpc_exception>
 
     l_->debug(lstrfmt("[%s] from %d -> RESPONSE with Accepted=%d, Term=%llu, NextIndex=%llu")
                       .fmt(msg_type_string(resp->get_type()),
-                           resp->get_dst(),
+                           resp->get_src(),
                            resp->get_accepted() ? 1 : 0,
                            resp->get_term(),
                            resp->get_next_idx()));
@@ -190,6 +192,8 @@ void raft_server::handle_install_snapshot_resp(resp_msg &resp) {
 }
 
 void raft_server::handle_ext_resp(ptr<resp_msg> &resp, const ptr<rpc_exception> &err) {
+    l_->debug(lstrfmt("%s %s %d: CurrentLeader=%d. TRACE").fmt(__FILE__, __FUNCTION__, __LINE__, leader_));
+
     recur_lock(lock_);
     if (err) {
         handle_ext_resp_err(*err);
@@ -198,7 +202,7 @@ void raft_server::handle_ext_resp(ptr<resp_msg> &resp, const ptr<rpc_exception> 
 
     l_->debug(lstrfmt("[%s] from %d -> RESPONSE with Accepted=%d, Term=%llu, NextIndex=%llu")
                       .fmt(msg_type_string(resp->get_type()),
-                           resp->get_dst(),
+                           resp->get_src(),
                            resp->get_accepted() ? 1 : 0,
                            resp->get_term(),
                            resp->get_next_idx()));

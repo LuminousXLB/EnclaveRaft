@@ -48,6 +48,8 @@ ptr<resp_msg> raft_server::process_req(req_msg &req) {
         }
     }
 
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     ptr<resp_msg> resp;
     if (req.get_type() == msg_type::append_entries_request) {
         resp = handle_append_entries(req);

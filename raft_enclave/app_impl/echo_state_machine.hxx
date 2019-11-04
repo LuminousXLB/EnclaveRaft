@@ -42,19 +42,19 @@ public:
     ~echo_state_machine() override = default;
 
     void pre_commit(const ulong log_idx, buffer &data) override {
-        string put = strfmt<256>("PRE_COMMIT %ul %s").fmt(log_idx, data.get_str());
+        string put = strfmt<256>("PRE_COMMIT %lu %s").fmt(log_idx, data.get_str());
         ocall_puts(put.c_str());
     }
 
     void commit(const ulong log_idx, buffer &data) override {
-        string put = strfmt<256>("COMMIT %ul %s").fmt(log_idx, data.get_str());
+        string put = strfmt<256>("COMMIT %lu %s").fmt(log_idx, data.get_str());
         ocall_puts(put.c_str());
 
         last_committed_idx_ = log_idx;
     }
 
     void rollback(const ulong log_idx, buffer &data) override {
-        string put = strfmt<256>("ROLLBACK %ul %s").fmt(log_idx, data.get_str());
+        string put = strfmt<256>("ROLLBACK %lu %s").fmt(log_idx, data.get_str());
         ocall_puts(put.c_str());
     }
 
@@ -70,12 +70,12 @@ public:
      */
     void save_snapshot_data(snapshot &s, const ulong offset, buffer &data) override {
 //        TODO:
-        string put = strfmt<256>("SAVE SNAPSHOT DATA %ul %s").fmt(offset, data.get_str());
+        string put = strfmt<256>("SAVE SNAPSHOT DATA %lu %s").fmt(offset, data.get_str());
         ocall_puts(put.c_str());
     }
 
     bool apply_snapshot(snapshot &s) override {
-        string put = strfmt<256>("APPLY_SNAPSHOT @log=%ul @term=%ul").fmt(
+        string put = strfmt<256>("APPLY_SNAPSHOT @log=%lu @term=%lu").fmt(
                 s.get_last_log_term(),
                 s.get_last_log_term()
         );
@@ -116,7 +116,7 @@ public:
     }
 
     void create_snapshot(snapshot &s, async_result<bool>::handler_type &when_done) override {
-        string put = strfmt<256>("CREATE_SNAPSHOT @log=%ul @term=%ul").fmt(
+        string put = strfmt<256>("CREATE_SNAPSHOT @log=%lu @term=%lu").fmt(
                 s.get_last_log_term(),
                 s.get_last_log_term()
         );

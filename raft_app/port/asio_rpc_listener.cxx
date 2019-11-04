@@ -12,13 +12,13 @@ extern shared_ptr<spdlog::logger> global_logger;
 static shared_ptr<asio_rpc_listener> listener;
 
 void ocall_rpc_listener_create(uint16_t port) {
-    spdlog::trace("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, port);
+    global_logger->trace("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, port);
 
     listener = make_shared<asio_rpc_listener>(*global_io_context, port, global_logger);
     listener->listen();
 }
 
 void ocall_rpc_listener_stop() {
-    spdlog::trace("{} {} {}", __FILE__, __FUNCTION__, __LINE__);
+    global_logger->trace("{} {} {}", __FILE__, __FUNCTION__, __LINE__);
     listener->stop();
 }

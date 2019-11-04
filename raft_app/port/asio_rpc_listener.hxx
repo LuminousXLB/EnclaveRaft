@@ -85,14 +85,13 @@ private:
             return;
         }
 
-        shared_ptr<asio_rpc_listener> self(this->shared_from_this());
-
-        shared_ptr<rpc_session> session = make_shared<rpc_session>(io_svc_,
-                                                                   &message_handler,
-                                                                   logger_,
-                                                                   std::bind(&asio_rpc_listener::remove_session,
-                                                                             self,
-                                                                             std::placeholders::_1));
+        auto self = shared_from_this();
+        auto session = make_shared<rpc_session>(io_svc_,
+                                                &message_handler,
+                                                logger_,
+                                                std::bind(&asio_rpc_listener::remove_session,
+                                                          self,
+                                                          std::placeholders::_1));
 
         acceptor_.async_accept(session->socket(), [self, this, session](const asio::error_code &err) -> void {
             if (!err) {

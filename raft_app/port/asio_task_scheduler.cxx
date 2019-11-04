@@ -44,6 +44,8 @@ void ocall_schedule_delayed_task(uint64_t task_uid, int32_t milliseconds) {
 }
 
 void ocall_cancel_delayed_task(uint64_t task_uid) {
+    global_logger->trace("{} {} {}: task_uid={}", __FILE__, __FUNCTION__, __LINE__, task_uid);
+
     lock_guard<mutex> lock(asio_task_scheduler_pool_lock);
 
     auto it = asio_task_scheduler_pool.find(task_uid);

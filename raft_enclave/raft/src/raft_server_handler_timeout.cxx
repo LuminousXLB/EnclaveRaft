@@ -22,6 +22,7 @@ using namespace cornerstone;
 
 
 void raft_server::handle_election_timeout() {
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
     recur_lock(lock_);
     if (steps_to_down_ > 0) {
         if (--steps_to_down_ == 0) {
@@ -45,12 +46,16 @@ void raft_server::handle_election_timeout() {
         return;
     }
 
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     if (catching_up_) {
         // this is a new server for the cluster, will not send out vote req until conf that includes this srv is committed
         l_->info("election timeout while joining the cluster, ignore it.");
         restart_election_timer();
         return;
     }
+
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
 
     if (role_ == srv_role::leader) {
         string line = "A leader should never encounter election timeout, illegal application state, stop the application";
@@ -59,6 +64,8 @@ void raft_server::handle_election_timeout() {
         throw raft_exception(line);
         return;
     }
+
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
 
     l_->debug("Election timeout, change to Candidate");
     state_->inc_term();
@@ -70,10 +77,14 @@ void raft_server::handle_election_timeout() {
     ctx_->state_mgr_->save_state(*state_);
     request_vote();
 
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     // restart the election timer if this is not yet a leader
     if (role_ != srv_role::leader) {
         restart_election_timer();
     }
+
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
 }
 
 void raft_server::handle_hb_timeout(peer &p) {

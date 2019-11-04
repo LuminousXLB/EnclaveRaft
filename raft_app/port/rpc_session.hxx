@@ -61,12 +61,11 @@ public:
         }
     }
 
-public:
     void start() {
-        auto remote = socket_.remote_endpoint();
-        logger_->info("Connection from {}:{}", remote.address().to_string(), remote.port());
-
-        shared_ptr<rpc_session> self = shared_from_this(); // this is safe since we only expose ctor to cs_new
+//        {
+//            auto remote = socket_.remote_endpoint();
+//            logger_->info("Connection from {}:{}", remote.address().to_string(), remote.port());
+//        }
 
         asio::error_code err;
         do {
@@ -75,14 +74,12 @@ public:
 
         if (err) {
             {
-                auto local_addr = fmt::format("{}:{}",
-                                              socket_.local_endpoint().address().to_string(),
+                auto local_addr = fmt::format("{}:{}", socket_.local_endpoint().address().to_string(),
                                               socket_.local_endpoint().port());
 
                 logger_->error("{} {} {}: local={} - {}", __FILE__, __FUNCTION__, __LINE__,
                                local_addr, err.message());
             }
-//            exit(-1);
             this->stop();
         }
 
@@ -100,18 +97,23 @@ public:
 
         message_buffer_.clear();
         message_buffer_.resize((size_t) data_size_, 0);
-        logger_->debug("{} {} {}: data_size = {}", __FILE__, __FUNCTION__, __LINE__, data_size_);
+        logger_->trace("{} {} {}: data_size = {}", __FILE__, __FUNCTION__, __LINE__, data_size_);
 
-        asio::async_read(this->socket_,
-                         asio::buffer(message_buffer_),
-                         std::bind(&rpc_session::read_log_data, self, std::placeholders::_1, std::placeholders::_2));
+        asio::async_read(this->socket_, asio::buffer(message_buffer_),
+                         std::bind(&rpc_session::read_log_data, shared_from_this(),
+                                   std::placeholders::_1,
+                                   std::placeholders::_2));
     }
 
     void stop() {
+        logger_->trace("{} {} {}: TRACE", __BASE_FILE__, __FUNCTION__, __LINE__);
+
         socket_.close();
         if (callback_) {
             callback_(this->shared_from_this());
         }
+
+        logger_->trace("{} {} {}: TRACE", __BASE_FILE__, __FUNCTION__, __LINE__);
     }
 
     asio::ip::tcp::socket &socket() {
@@ -123,7 +125,7 @@ private:
         if (!err) {
             this->read_complete();
         } else {
-            logger_->error("failed to read rpc log data from socket due to error {}", err.value());
+            logger_->error("failed to read rpc log data from socket due to error [{}]{}", err.value(), err.message());
             this->stop();
         }
     }
@@ -139,7 +141,7 @@ private:
         // this part is for log
 
         shared_ptr<rpc_session> self = this->shared_from_this();
-        logger_->debug("{} {}: {} <- {}  read {}", __FILE__, __LINE__,
+        logger_->trace("{} {}: {} <- {}  read {}", __FILE__, __LINE__,
                        local_addr, remote_addr, spdlog::to_hex(message_buffer_));
 
         try {
@@ -147,9 +149,9 @@ private:
             uint32_t length = resp_buf->size();
 
             if (resp_buf) {
-                logger_->debug("{} {} {}: resp_size {}", __FILE__, __FUNCTION__, __LINE__,
+                logger_->trace("{} {} {}: resp_size {}", __FILE__, __FUNCTION__, __LINE__,
                                resp_buf->size());
-                logger_->debug("{} {} {}: {} -> {} send {}", __FILE__, __FUNCTION__, __LINE__,
+                logger_->trace("{} {} {}: {} -> {} send {}", __FILE__, __FUNCTION__, __LINE__,
                                local_addr, remote_addr, spdlog::to_hex(*resp_buf));
 
                 asio::write(socket_, asio::buffer(&length, sizeof(length)));

@@ -75,6 +75,8 @@ bool raft_server::request_append_entries(peer &p) {
 }
 
 void raft_server::restart_election_timer() {
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     // don't start the election timer while this server is still catching up the logs
     if (catching_up_) {
         return;
@@ -125,24 +127,33 @@ void raft_server::become_leader() {
 }
 
 void raft_server::enable_hb_for_peer(peer &p) {
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     p.enable_hb(true);
     p.resume_hb_speed();
     scheduler_->schedule(p.get_hb_task(), p.get_current_hb_interval());
 }
 
 void raft_server::become_follower() {
+    l_->debug(lstrfmt("%s %s %d: CurrentLeader=%d. TRACE").fmt(__FILE__, __FUNCTION__, __LINE__, leader_));
+
     // stop hb for all peers
     for (peer_itor it = peers_.begin(); it != peers_.end(); ++it) {
+        l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
         it->second->enable_hb(false);
     }
 
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
     srv_to_join_.reset();
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
     role_ = srv_role::follower;
 
     restart_election_timer();
 }
 
 bool raft_server::update_term(ulong term) {
+    l_->debug(lstrfmt("%s %s %d: CurrentLeader=%d. TRACE").fmt(__FILE__, __FUNCTION__, __LINE__, leader_));
+
     if (term > state_->get_term()) {
         state_->set_term(term);
         state_->set_voted_for(-1);

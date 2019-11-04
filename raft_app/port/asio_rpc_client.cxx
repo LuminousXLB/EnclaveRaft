@@ -31,7 +31,6 @@ static map<uint32_t, shared_ptr<asio_rpc_client>> rpc_client_pool;
 uint32_t ocall_rpc_client_create(const char *endpoint) {
     // the endpoint is expecting to be protocol://host:port, and we only support tcp for this factory
     // which is endpoint must be tcp://hostname:port
-
     string ep = endpoint;
     static regex reg("^tcp://(([a-zA-Z0-9\\-]+\\.)*([a-zA-Z0-9]+)):([0-9]+)$");
     smatch match_results;

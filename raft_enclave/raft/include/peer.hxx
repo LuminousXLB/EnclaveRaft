@@ -152,7 +152,7 @@ namespace cornerstone {
             p_logger->debug(
                     lstrfmt("[%s] to %d <- REQUEST with LastLogIndex=%llu, LastLogTerm=%llu, EntriesLength=%d, CommitIndex=%llu and Term=%llu")
                             .fmt(msg_type_string(req->get_type()),
-                                 req->get_src(),
+                                 req->get_dst(),
                                  req->get_last_log_idx(),
                                  req->get_last_log_term(),
                                  req->log_entries().size(),
