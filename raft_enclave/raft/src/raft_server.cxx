@@ -85,8 +85,9 @@ void raft_server::restart_election_timer() {
     } else {
         election_task_ = cs_new<timer_task<void>>(election_exec_);
     }
+    int32_t timeout = rand_timeout_();
 
-    scheduler_->schedule(election_task_, rand_timeout_());
+    scheduler_->schedule(election_task_, timeout);
 }
 
 void raft_server::stop_election_timer() {
@@ -130,44 +131,28 @@ void raft_server::enable_hb_for_peer(peer &p) {
 }
 
 void raft_server::become_follower() {
-    l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
-
     // stop hb for all peers
     for (peer_itor it = peers_.begin(); it != peers_.end(); ++it) {
         it->second->enable_hb(false);
     }
 
-    l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
-
     srv_to_join_.reset();
     role_ = srv_role::follower;
 
-    l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
-
     restart_election_timer();
-
-    l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
 }
 
 bool raft_server::update_term(ulong term) {
-    l_->info(lstrfmt("||| COME TO HERE -> %s %s %d -> %016x").fmt(__FILE__, __FUNCTION__, __LINE__, term));
-
     if (term > state_->get_term()) {
         state_->set_term(term);
         state_->set_voted_for(-1);
         election_completed_ = false;
 
-        l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
-
         votes_granted_ = 0;
         voted_servers_.clear();
         ctx_->state_mgr_->save_state(*state_);
 
-        l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
-
         become_follower();
-
-        l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
 
         return true;
     }
@@ -388,11 +373,13 @@ void raft_server::reconfigure(const ptr<cluster_config> &new_config) {
         ptr<srv_config> srv_added(*it);
 
         // construct timeout_handler
-        auto exec = (timer_task<peer &>::executor) std::bind(&raft_server::handle_hb_timeout, this,
+        auto exec = (timer_task<peer &>::executor) std::bind(&raft_server::handle_hb_timeout,
+                                                             this,
                                                              std::placeholders::_1);
 
         // construct peer
-        ptr<peer> p = cs_new<peer, ptr<srv_config> &, context &, timer_task<peer &>::executor &>(srv_added, *ctx_,
+        ptr<peer> p = cs_new<peer, ptr<srv_config> &, context &, timer_task<peer &>::executor &>(srv_added,
+                                                                                                 *ctx_,
                                                                                                  exec);
         p->set_next_log_idx(log_store_->next_slot());
 
@@ -481,22 +468,6 @@ void raft_server::invite_srv_to_join_cluster() {
                                        log_store_->next_slot() - 1,
                                        quick_commit_idx_);
 
-    {
-        l_->debug(lstrfmt("%s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
-        string srvs;
-        for (const auto &server: config_->get_servers()) {
-            srvs += server->get_endpoint();
-            srvs += " ";
-        }
-        l_->debug(srvs);
-    }
-
-#if 0
-    ptr<cluster_config> c_conf = get_config();
-    req->log_entries().push_back(cs_new<log_entry>(state_->get_term(), c_conf->serialize(), log_val_type::conf));
-    srv_to_join_->send_req(srv_to_join_, req, ex_resp_handler_);
-    p_in("sent join request to peer %d, %s", srv_to_join_->get_id(), srv_to_join_->get_endpoint().c_str());
-#endif
     ptr<log_entry> entry = cs_new<log_entry>(state_->get_term(), config_->serialize(), log_val_type::conf);
     req->log_entries().push_back(entry);
     srv_to_join_->send_req(req, ex_resp_handler_);

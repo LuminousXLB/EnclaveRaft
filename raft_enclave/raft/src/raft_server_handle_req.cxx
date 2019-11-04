@@ -152,12 +152,12 @@ ptr<resp_msg> raft_server::handle_cli_req(req_msg &req) {
     }
 
     std::vector<ptr<log_entry>> &entries = req.log_entries();
-    for (auto &entrie : entries) {
+    for (auto &entry : entries) {
         // force the log's term to current term
-        entrie->set_term(state_->get_term());
+        entry->set_term(state_->get_term());
 
-        log_store_->append(entrie);
-        state_machine_->pre_commit(log_store_->next_slot() - 1, entrie->get_buf());
+        log_store_->append(entry);
+        state_machine_->pre_commit(log_store_->next_slot() - 1, entry->get_buf());
     }
 
     // urgent commit, so that the commit will not depend on hb
@@ -208,6 +208,7 @@ ptr<resp_msg> raft_server::handle_add_srv_req(req_msg &req) {
     }
 
     ptr<srv_config> srv_conf = srv_config::deserialize(entries[0]->get_buf());
+
     if (peers_.find(srv_conf->get_id()) != peers_.end() || id_ == srv_conf->get_id()) {
         l_->warn(lstrfmt("the server to be added has a duplicated id with existing server %d").fmt(srv_conf->get_id()));
         return resp;

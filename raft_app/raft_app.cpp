@@ -33,7 +33,8 @@ int main(int argc, char const *argv[]) {
 
     global_io_context = make_shared<asio::io_context>();
     global_logger = spdlog::stdout_color_mt("raft");
-    global_logger->set_level(spdlog::level::trace);
+    global_logger->set_level(spdlog::level::debug);
+    global_logger->set_pattern("%^[%H:%M:%S.%f] @ %t [%l]%$ %v");
 
     /* Enclave Initialization */
     if (initialize_enclave(&global_enclave_id, "raft_enclave.token", "Enclave_raft.signed.so") < 0) {

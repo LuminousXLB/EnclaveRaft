@@ -54,8 +54,6 @@ public:
 
 public:
     void send(uint32_t request_uid, const uint8_t *message, int32_t size) {
-        global_logger->debug("{} {} {}: client={}, TRACE", __FILE__, __FUNCTION__, __LINE__, client_uid_);
-
         shared_ptr<asio_rpc_client> self = shared_from_this();
 
         if (!socket_.is_open()) {
@@ -83,17 +81,14 @@ public:
             );
         } else {
             // this part is for log
-            auto remote_addr = fmt::format("{}:{}",
-                                           socket_.remote_endpoint().address().to_string(),
-                                           socket_.remote_endpoint().port());
             auto local_addr = fmt::format("{}:{}",
                                           socket_.local_endpoint().address().to_string(),
                                           socket_.local_endpoint().port());
             // this part is for log
-
-            global_logger->debug("{} {} {}: req_size {}", __FILE__, __FUNCTION__, __LINE__, size);
-            global_logger->debug("{} {} {}: {} -> {} send {}", __FILE__, __FUNCTION__, __LINE__,
-                                 local_addr, remote_addr, spdlog::to_hex(message, message + size));
+            global_logger->trace("{} {} {}: client={} request={} local={} size={} send {}",
+                                 __FILE__, __FUNCTION__, __LINE__,
+                                 client_uid_, request_uid, local_addr, size,
+                                 spdlog::to_hex(message, message + size));
 
             asio::write(socket_, asio::buffer(&size, sizeof(int32_t)));
             asio::async_write(
@@ -119,46 +114,21 @@ private:
     }
 
     void sent(uint32_t request_uid, asio::error_code err, size_t bytes_transferred) {
-        global_logger->debug("{} {} {}: client={}, TRACE", __FILE__, __FUNCTION__, __LINE__, client_uid_);
+        global_logger->trace("{} {} {}: client={}, TRACE", __FILE__, __FUNCTION__, __LINE__, client_uid_);
 
         shared_ptr<asio_rpc_client> self = this->shared_from_this();
 
-        global_logger->debug("{} {} {}: client={}, TRACE", __FILE__, __FUNCTION__, __LINE__, client_uid_);
+        global_logger->trace("{} {} {}: client={}, TRACE", __FILE__, __FUNCTION__, __LINE__, client_uid_);
 
         if (!err) {
             // read a response
-            int32_t data_size;
-
-            asio::error_code ec;
+            int32_t data_size = 0;
+            size_t bytes_read = 0;
             do {
-                asio::read(socket_, asio::buffer(&data_size, sizeof(uint32_t)), ec);
-            } while (ec == asio::error::eof);
+                bytes_read = asio::read(socket_, asio::buffer(&data_size, sizeof(int32_t)), err);
+            } while (err == asio::error::eof);
 
-            if (ec) {
-                global_logger->error("Error read response: {}", ec.message());
-                socket_.close();
-                return;
-            }
-
-            global_logger->debug("{} {} {}: client={}, TRACE", __FILE__, __FUNCTION__, __LINE__, client_uid_);
-
-            auto message_buffer = make_shared<vector<uint8_t>>(data_size, 0);
-
-            size_t br;
-
-            do {
-                br = asio::read(socket_, asio::buffer(*message_buffer), ec);
-            } while (br == asio::error::eof);
-
-            response_read(request_uid, message_buffer, ec, br);
-            // FIXME: async read
-//            asio::async_read(socket_,
-//                             asio::buffer(*message_buffer),
-//                             [self, request_uid, message_buffer](asio::error_code err,
-//                                                                  size_t bytes_read) mutable -> void {
-//                                 self->response_read(request_uid, message_buffer, err, bytes_read);
-//                             }
-//            );
+            size_received(request_uid, data_size, err, bytes_read);
         } else {
             string e = fmt::format("failed to send request to remote socket due to error [{}] {}",
                                    err.value(), err.message());
@@ -167,7 +137,39 @@ private:
         }
     }
 
-    void response_read(uint32_t req_uid, const shared_ptr<vector<uint8_t>> &resp, asio::error_code err, size_t _br) {
+    void size_received(uint32_t req_uid, int32_t data_size, asio::error_code ec, size_t bytes_read) {
+        if (ec) {
+            string e = fmt::format("failed to read response size from remote socket due to error [{}] {}",
+                                   ec.value(), ec.message());
+            ecall_rpc_response(global_enclave_id, req_uid, 0, nullptr, e.c_str());
+            socket_.close();
+            return;
+        }
+
+        global_logger->trace("{} {} {}: client={}, response={}, header_size={}, data_size={} TRACE", __FILE__,
+                             __FUNCTION__, __LINE__,
+                             client_uid_, req_uid, bytes_read, data_size);
+
+        shared_ptr<asio_rpc_client> self = this->shared_from_this();
+
+        buffer_map_[req_uid] = make_shared<vector<uint8_t >>(data_size, 0);
+//        resp_buffer_.clear();
+//        resp_buffer_.resize(data_size, 0);
+
+        asio::async_read(socket_,
+                         asio::buffer(*buffer_map_[req_uid]),
+                         [self, req_uid](asio::error_code err, size_t bytes_read) {
+                             self->response_read(req_uid, err, bytes_read);
+                         });
+    }
+
+    void response_read(uint32_t req_uid, asio::error_code err, size_t bytes_read) {
+        auto resp_buffer = buffer_map_[req_uid];
+
+        global_logger->trace("{} {} {}: client={}, response={}, buffer_size={}, bytes_read={}, TRACE", __FILE__,
+                             __FUNCTION__, __LINE__,
+                             client_uid_, req_uid, resp_buffer->size(), bytes_read);
+
         if (!err) {
             auto remote_addr = fmt::format("{}:{}",
                                            socket_.remote_endpoint().address().to_string(),
@@ -176,21 +178,21 @@ private:
                                           socket_.local_endpoint().address().to_string(),
                                           socket_.local_endpoint().port());
 
-            global_logger->debug("{} {} {}: client={}, response={}, resp_size {}", __FILE__, __FUNCTION__, __LINE__,
-                                 client_uid_, req_uid, resp->size());
-            global_logger->debug("{} {} {}: local_addr={}, TRACE", __FILE__, __FUNCTION__, __LINE__, local_addr);
-            global_logger->debug("{} {} {}: remote_addr={}, TRACE", __FILE__, __FUNCTION__, __LINE__, remote_addr);
+            global_logger->trace("{} {} {}: client={}, response={}, resp_size {}", __FILE__, __FUNCTION__, __LINE__,
+                                 client_uid_, req_uid, resp_buffer->size());
+            global_logger->trace("{} {} {}: {} <- {} client={}, response={}. read {}", __FILE__, __FUNCTION__, __LINE__,
+                                 local_addr, remote_addr, client_uid_, req_uid,
+                                 spdlog::to_hex(resp_buffer->data(), resp_buffer->data() + bytes_read));
 
-            global_logger->debug("{} {} {}: {} <- {} client={}, response={}. read {}", __FILE__, __FUNCTION__, __LINE__,
-                                 local_addr, remote_addr, client_uid_, req_uid, spdlog::to_hex(*resp));
-
-            ecall_rpc_response(global_enclave_id, req_uid, resp->size(), resp->data(), nullptr);
+            ecall_rpc_response(global_enclave_id, req_uid, resp_buffer->size(), resp_buffer->data(), nullptr);
         } else {
             string e = fmt::format("failed to read response from remote socket due to error [{}] {}",
                                    err.value(), err.message());
             ecall_rpc_response(global_enclave_id, req_uid, 0, nullptr, e.c_str());
             socket_.close();
         }
+
+        buffer_map_.erase(req_uid);
     }
 
 private:
@@ -199,6 +201,9 @@ private:
     std::string host_;
     std::string port_;
     uint32_t client_uid_;
+//    int32_t data_size_;
+    std::map<uint32_t, shared_ptr<vector<uint8_t >>> buffer_map_;
+//    vector<uint8_t> resp_buffer_;
 };
 
 

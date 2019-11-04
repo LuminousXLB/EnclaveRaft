@@ -67,7 +67,7 @@ private:
     // From delayed_task_scheduler
     void cancel_impl(ptr<delayed_task> &task) override {
         if (task->get_impl_context() == nilptr) {
-            auto *task_uid = static_cast<uint64_t *> (task->get_impl_context());
+            auto task_uid = static_cast<uint64_t *> (task->get_impl_context());
             ocall_cancel_delayed_task(*task_uid);
         }
     }

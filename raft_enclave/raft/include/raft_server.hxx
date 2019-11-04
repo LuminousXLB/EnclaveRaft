@@ -65,10 +65,12 @@ namespace cornerstone {
                                                            std::placeholders::_2)),
                   last_snapshot_(ctx->state_machine_->last_snapshot()),
                   voted_servers_() {
+
             random_device engine;
-            std::uniform_int_distribution<int32> distribution(ctx->params_->election_timeout_lower_bound_,
-                                                              ctx->params_->election_timeout_upper_bound_);
-            rand_timeout_ = [&distribution, &engine]() -> int32 {
+            int32 lower_bound = ctx->params_->election_timeout_lower_bound_;
+            int32 upper_bound = ctx->params_->election_timeout_upper_bound_;
+            rand_timeout_ = [&engine, lower_bound, upper_bound]() -> int32 {
+                std::uniform_int_distribution<int32> distribution(lower_bound, upper_bound);
                 return distribution(engine);
             };
 

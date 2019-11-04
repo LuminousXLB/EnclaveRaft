@@ -15,8 +15,6 @@ mutex rpc_client_callback_pool_lock;
 atomic<uint32_t> last_req_uid_;
 
 void ecall_rpc_response(uint32_t req_uid, uint32_t size, const uint8_t *msg, const char *exception) {
-    p_logger->debug(lstrfmt("%s %s %d: resp_size=%u").fmt(__FILE__, __FUNCTION__, __LINE__, size));
-
     ptr<req_msg> req;
     rpc_handler when_done;
     {
@@ -37,13 +35,8 @@ void ecall_rpc_response(uint32_t req_uid, uint32_t size, const uint8_t *msg, con
 
         rsp = deserialize_resp(resp_buf);
     } else {
-        p_logger->err(lstrfmt("%s %s %d: exception: %s").fmt(__FILE__, __FUNCTION__, __LINE__, exception));
         except = cs_new<rpc_exception>(exception, req);
     }
 
-    p_logger->debug(lstrfmt("%s %s %d: resp_size=%u").fmt(__FILE__, __FUNCTION__, __LINE__, size));
-
     when_done(rsp, except);
-
-    p_logger->info(lstrfmt("%s %s %d: resp_size=%u").fmt(__FILE__, __FUNCTION__, __LINE__, size));
 }

@@ -82,8 +82,7 @@ public:
                 logger_->error("{} {} {}: local={} - {}", __FILE__, __FUNCTION__, __LINE__,
                                local_addr, err.message());
             }
-
-            exit(-1);
+//            exit(-1);
             this->stop();
         }
 

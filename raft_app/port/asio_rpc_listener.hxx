@@ -39,7 +39,7 @@ extern sgx_enclave_id_t global_enclave_id;
 
 
 shared_ptr<vector<uint8_t>> message_handler(const vector<uint8_t> &message) {
-    spdlog::debug("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, message.size());
+    spdlog::trace("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, message.size());
 
     uint32_t uid;
     int32_t resp_len;
@@ -51,9 +51,8 @@ shared_ptr<vector<uint8_t>> message_handler(const vector<uint8_t> &message) {
 
     auto buffer = make_shared<vector<uint8_t >>(resp_len, 0);
     bool ret;
-    spdlog::debug("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, "Before ecall_fetch_rpc_response");
     ecall_fetch_rpc_response(global_enclave_id, &ret, uid, buffer->size(), &(*buffer)[0]);
-    spdlog::debug("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, "After ecall_fetch_rpc_response");
+
     if (ret) {
         return buffer;
     } else {
@@ -88,12 +87,12 @@ private:
 
         shared_ptr<asio_rpc_listener> self(this->shared_from_this());
 
-        shared_ptr<rpc_session> session(make_shared<rpc_session>(
-                io_svc_,
-                &message_handler,
-                logger_,
-                std::bind(&asio_rpc_listener::remove_session, self, std::placeholders::_1))
-        );
+        shared_ptr<rpc_session> session = make_shared<rpc_session>(io_svc_,
+                                                                   &message_handler,
+                                                                   logger_,
+                                                                   std::bind(&asio_rpc_listener::remove_session,
+                                                                             self,
+                                                                             std::placeholders::_1));
 
         acceptor_.async_accept(session->socket(), [self, this, session](const asio::error_code &err) -> void {
             if (!err) {

@@ -24,15 +24,12 @@ using cornerstone::lstrfmt;
 
 
 ptr<msg_handler> rpc_listener_req_handler;
-extern ptr<cornerstone::logger> p_logger;
 
 static mutex message_buffer_lock;
 static atomic<uint32_t> id_counter;
 static map<uint32_t, bufptr> message_buffer;
 
 int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t *msg_id) {
-    p_logger->debug(lstrfmt("%s %s %d: req_size=%u").fmt(__FILE__, __FUNCTION__, __LINE__, size));
-
     // FIXME: Encrypt & Decrypt
     bufptr header = buffer::alloc(RPC_REQ_HEADER_SIZE);
     memcpy_s(header->data(), header->size(), message, RPC_REQ_HEADER_SIZE);
@@ -44,8 +41,6 @@ int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t
 
     try {
         ptr<req_msg> req = deserialize_req(header, log_data);
-        p_logger->debug(lstrfmt("%s %s %d: req_type=%d").fmt(__FILE__, __FUNCTION__, __LINE__, req->get_type()));
-
         ptr<resp_msg> resp = rpc_listener_req_handler->process_req(*req);
 
         if (!resp) {
@@ -54,17 +49,6 @@ int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t
             *msg_id = 0;
             return 0;
         } else {
-            p_logger->debug(
-                    lstrfmt("%s: MessageId=%d REQUEST.type=[%s, %d].term=%016llx RESPONSE.type=[%s, %d].term=%016llx")
-                            .fmt(__FUNCTION__,
-                                 *msg_id,
-                                 msg_type_string(req->get_type()),
-                                 req->get_type(),
-                                 req->get_term(),
-                                 msg_type_string(resp->get_type()),
-                                 resp->get_type(),
-                                 resp->get_term()));
-
             bufptr resp_buf = serialize_resp(resp);
 
             {
@@ -84,8 +68,6 @@ int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t
 }
 
 bool ecall_fetch_rpc_response(uint32_t msg_id, uint32_t buffer_size, uint8_t *buffer) {
-    p_logger->debug(lstrfmt("%s %s %d: %u").fmt(__FILE__, __FUNCTION__, __LINE__, msg_id));
-
     lock_guard<mutex> lock(message_buffer_lock);
     auto it = message_buffer.find(msg_id);
     if (it == message_buffer.end()) {

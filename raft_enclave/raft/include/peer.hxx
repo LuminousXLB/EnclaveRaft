@@ -28,7 +28,7 @@
 #include "rpc/rpc_client_interface.hxx"
 #include "context.hxx"
 
-extern std::shared_ptr<cornerstone::logger> p_logger;
+extern cornerstone::ptr<cornerstone::logger> p_logger;
 
 namespace cornerstone {
     class peer {
@@ -161,19 +161,12 @@ namespace cornerstone {
 
             ptr<rpc_result> pending = cs_new<rpc_result>(handler);
 
-            p_logger->debug(lstrfmt("%s %s %d: req_type=%d").fmt(__FILE__, __FUNCTION__, __LINE__, req->get_type()));
-
             rpc_handler h = (rpc_handler) std::bind(
                     &peer::handle_rpc_result,
                     this, req, pending, std::placeholders::_1, std::placeholders::_2
             );
 
-            p_logger->debug(lstrfmt("%s %s %d: req_type=%d").fmt(__FILE__, __FUNCTION__, __LINE__, req->get_type()));
-
             rpc_->send(req, h);
-
-            p_logger->debug(lstrfmt("%s %s %d: req_type=%d").fmt(__FILE__, __FUNCTION__, __LINE__, req->get_type()));
-
         }
 
     private:

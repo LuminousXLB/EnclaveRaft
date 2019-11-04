@@ -36,11 +36,11 @@ void raft_server::handle_peer_resp(ptr<resp_msg> &resp, const ptr<rpc_exception>
     }
 
     l_->debug(lstrfmt("[%s] from %d -> RESPONSE with Accepted=%d, Term=%llu, NextIndex=%llu")
-                            .fmt(msg_type_string(resp->get_type()),
-                                 resp->get_dst(),
-                                 resp->get_accepted() ? 1 : 0,
-                                 resp->get_term(),
-                                 resp->get_next_idx()));
+                      .fmt(msg_type_string(resp->get_type()),
+                           resp->get_dst(),
+                           resp->get_accepted() ? 1 : 0,
+                           resp->get_term(),
+                           resp->get_next_idx()));
 
     // if term is updated, no more action is required
     if (update_term(resp->get_term())) {
@@ -190,8 +190,6 @@ void raft_server::handle_install_snapshot_resp(resp_msg &resp) {
 }
 
 void raft_server::handle_ext_resp(ptr<resp_msg> &resp, const ptr<rpc_exception> &err) {
-    l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
-
     recur_lock(lock_);
     if (err) {
         handle_ext_resp_err(*err);
@@ -216,7 +214,6 @@ void raft_server::handle_ext_resp(ptr<resp_msg> &resp, const ptr<rpc_exception> 
             }
             break;
         case msg_type::join_cluster_response:
-            l_->info(lstrfmt("||| COME TO HERE -> %s %s %d").fmt(__FILE__, __FUNCTION__, __LINE__));
             if (srv_to_join_) {
                 if (resp->get_accepted()) {
                     l_->debug("new server confirms it will join, start syncing logs to it");
