@@ -27,14 +27,15 @@ ptr<logger> raft_server::get_logger() {
 ptr<resp_msg> raft_server::process_req(req_msg &req) {
     recur_lock(lock_);
     l_->debug(
-            lstrfmt("[%s] from %d -> REQUEST with LastLogIndex=%llu, LastLogTerm=%llu, EntriesLength=%d, CommitIndex=%llu and Term=%llu")
+            lstrfmt("[%s] from %d -> REQUEST with LastLogIndex=%llu, LastLogTerm=%llu, EntriesLength=%d, CommitIndex=%llu and Term=%llu [CurrentLeader=%d]")
                     .fmt(msg_type_string(req.get_type()),
                          req.get_src(),
                          req.get_last_log_idx(),
                          req.get_last_log_term(),
                          req.log_entries().size(),
                          req.get_commit_idx(),
-                         req.get_term()));
+                         req.get_term(),
+                         leader_));
 
     if (req.get_type() == msg_type::append_entries_request ||
         req.get_type() == msg_type::request_vote_request ||
@@ -63,12 +64,13 @@ ptr<resp_msg> raft_server::process_req(req_msg &req) {
     }
 
     if (resp) {
-        l_->debug(lstrfmt("[%s] to %d <- RESPONSE with Accepted=%d, Term=%llu, NextIndex=%llu")
+        l_->debug(lstrfmt("[%s] to %d <- RESPONSE with Accepted=%d, Term=%llu, NextIndex=%llu [CurrentLeader=%d]")
                           .fmt(msg_type_string(resp->get_type()),
                                resp->get_dst(),
                                resp->get_accepted() ? 1 : 0,
                                resp->get_term(),
-                               resp->get_next_idx()));
+                               resp->get_next_idx(),
+                               leader_));
     }
 
     return resp;

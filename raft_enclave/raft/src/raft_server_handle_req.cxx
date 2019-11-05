@@ -39,8 +39,12 @@ ptr<resp_msg> raft_server::handle_append_entries(req_msg &req) {
     // After a snapshot the req.get_last_log_idx() may less than log_store_->next_slot() but equals to log_store_->next_slot() -1
     // In this case, log is Okay if req.get_last_log_idx() == lastSnapshot.get_last_log_idx() && req.get_last_log_term() == lastSnapshot.get_last_log_term()
     // In not accepted case, we will return log_store_->next_slot() for the leader to quick jump to the index that might aligned
-    ptr<resp_msg> resp(cs_new<resp_msg>(state_->get_term(), msg_type::append_entries_response, id_, req.get_src(),
-                                        log_store_->next_slot()));
+    ptr<resp_msg> resp = cs_new<resp_msg>(state_->get_term(),
+                                          msg_type::append_entries_response,
+                                          id_,
+                                          req.get_src(),
+                                          log_store_->next_slot());
+
     bool log_okay = req.get_last_log_idx() == 0 ||
                     (req.get_last_log_idx() < log_store_->next_slot() &&
                      req.get_last_log_term() == term_for_log(req.get_last_log_idx()));
@@ -64,7 +68,7 @@ ptr<resp_msg> raft_server::handle_append_entries(req_msg &req) {
 
         // dealing with overwrites
         while (idx < log_store_->next_slot() && log_idx < req.log_entries().size()) {
-            ptr<log_entry> old_entry(log_store_->entry_at(idx));
+            ptr<log_entry> old_entry = log_store_->entry_at(idx);
             if (old_entry->get_val_type() == log_val_type::app_log) {
                 state_machine_->rollback(idx, old_entry->get_buf());
             } else if (old_entry->get_val_type() == log_val_type::conf) {

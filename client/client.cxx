@@ -39,21 +39,21 @@ int main() {
 
     spdlog::info("\tadding server 2");
     leader_id = add_server(io_context, leader_id, 2);
-    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(1000));
+    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(400));
 
     spdlog::info("\tadding server 3");
     leader_id = add_server(io_context, leader_id, 3);
-    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(1000));
+    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(400));
 
     spdlog::info("\tadding server 4");
     leader_id = add_server(io_context, leader_id, 4);
-    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(1000));
+    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(400));
 
     spdlog::info("\tadding server 5");
     leader_id = add_server(io_context, leader_id, 5);
-    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(1000));
+    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(400));
 
     spdlog::info("\tcommitting message");
     leader_id = client_request(io_context, leader_id, "Hello");
-    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(1000));
+    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(400));
 }
