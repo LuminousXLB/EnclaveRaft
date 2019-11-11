@@ -1,0 +1,8 @@
+//
+// Created by ncl on 11/11/19.
+//
+
+#ifndef ENCLAVERAFT_CRYPTO_HXX
+#define ENCLAVERAFT_CRYPTO_HXX
+
+#endif //ENCLAVERAFT_CRYPTO_HXX
