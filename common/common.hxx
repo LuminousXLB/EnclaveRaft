@@ -10,6 +10,10 @@
 #include <array>
 #include <memory>
 
+using std::vector;
+using std::array;
+using std::make_shared;
+
 static constexpr unsigned int S_KEY_SIZE = 32;
 static constexpr unsigned int S_BLOCK_SIZE = 16;
 

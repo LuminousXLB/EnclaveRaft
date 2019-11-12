@@ -6,12 +6,11 @@
 #define ENCLAVERAFT_INTEL_IAS_HXX
 
 #include "ssl_client.hxx"
+
 #include "common.hxx"
 #include <memory>
+#include <cstring>
 
-using std::string;
-using std::array;
-using std::vector;
 using std::make_shared;
 
 static const char *host = "api.trustedservices.intel.com";
@@ -52,22 +51,20 @@ public:
         request += body;
         request += "\r\n";
 
-
-
         connection_ = make_shared<ssl_client>(*io_context_, *ssl_context_, host, protocol);
         return connection_->request(reinterpret_cast<const uint8_t *>(request.data()), request.size());
     }
 
-    const map<string, string> &response_headers() const {
-        return connection_->response_headers();
+    string str() const {
+        return string(data(), data() + size());
     }
 
-    size_t content_length() const {
-        return connection_->content_length();
+    size_t size() const {
+        return connection_->size();
     }
 
-    const void *response_body() const {
-        return connection_->response_body();
+    const char *data() const {
+        return static_cast<const char *>(connection_->data());
     }
 
 private:
