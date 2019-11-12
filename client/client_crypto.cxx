@@ -18,7 +18,7 @@ byte *get_key() {
 
 
 ptr<bytes> client_encrypt(const byte *data, uint32_t size) {
-    spdlog::info(std::string("Encrypt <- Plaintext: ") + hex::encode(data, size));
+    spdlog::debug(std::string("Encrypt <- Plaintext: ") + hex::encode(data, size));
 
     byte iv[S_BLOCK_SIZE];
     rand_fill(iv, S_BLOCK_SIZE);
@@ -27,7 +27,7 @@ ptr<bytes> client_encrypt(const byte *data, uint32_t size) {
     enc->insert(enc->begin(), iv, iv + S_BLOCK_SIZE);
 
     if (enc) {
-        spdlog::info(std::string("Encrypt -> Ciphertext: ") + hex::encode(*enc));
+        spdlog::debug(std::string("Encrypt -> Ciphertext: ") + hex::encode(*enc));
     } else {
         spdlog::error("ENCRYPTION FAILED");
     }
@@ -36,12 +36,12 @@ ptr<bytes> client_encrypt(const byte *data, uint32_t size) {
 }
 
 ptr<bytes> client_decrypt(const byte *data, uint32_t size) {
-    spdlog::info(std::string("Decrypt <- Ciphertext: ") + hex::encode(data, size));
+    spdlog::debug(std::string("Decrypt <- Ciphertext: ") + hex::encode(data, size));
 
     auto dec = aes_ctr_decrypt(get_key(), data, data + S_BLOCK_SIZE, size - S_BLOCK_SIZE);
 
     if (dec) {
-        spdlog::info(std::string("Decrypt -> Plaintext: ") + hex::encode(*dec));
+        spdlog::debug(std::string("Decrypt -> Plaintext: ") + hex::encode(*dec));
     } else {
         spdlog::error("DECRYPTION FAILED");
     }

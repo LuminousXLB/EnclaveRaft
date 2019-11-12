@@ -21,7 +21,7 @@ byte *get_key() {
 
 
 ptr<bytes> raft_encrypt(const uint8_t *data, uint32_t size) {
-    p_logger->info(std::string("Encrypt <- Plaintext: ") + hex::encode(data, size));
+    p_logger->debug(std::string("Encrypt <- Plaintext: ") + hex::encode(data, size));
 
     byte iv[S_BLOCK_SIZE];
     rand_fill(iv, S_BLOCK_SIZE);
@@ -30,7 +30,7 @@ ptr<bytes> raft_encrypt(const uint8_t *data, uint32_t size) {
     enc->insert(enc->begin(), iv, iv + S_BLOCK_SIZE);
 
     if (enc) {
-        p_logger->info(std::string("Encrypt -> Ciphertext: ") + hex::encode(*enc));
+        p_logger->debug(std::string("Encrypt -> Ciphertext: ") + hex::encode(*enc));
     } else {
         p_logger->err("ENCRYPTION FAILED");
     }
@@ -39,12 +39,12 @@ ptr<bytes> raft_encrypt(const uint8_t *data, uint32_t size) {
 }
 
 ptr<bytes> raft_decrypt(const uint8_t *data, uint32_t size) {
-    p_logger->info(std::string("Decrypt <- Ciphertext: ") + hex::encode(data, size));
+    p_logger->debug(std::string("Decrypt <- Ciphertext: ") + hex::encode(data, size));
 
     auto dec = aes_ctr_decrypt(get_key(), data, data + S_BLOCK_SIZE, size - S_BLOCK_SIZE);
 
     if (dec) {
-        p_logger->info(std::string("Decrypt -> Plaintext: ") + hex::encode(*dec));
+        p_logger->debug(std::string("Decrypt -> Plaintext: ") + hex::encode(*dec));
     } else {
         p_logger->err("DECRYPTION FAILED");
     }
