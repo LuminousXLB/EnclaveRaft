@@ -19,20 +19,16 @@
 #ifndef ENCLAVERAFT_ASIO_RPC_SESSION_HXX
 #define ENCLAVERAFT_ASIO_RPC_SESSION_HXX
 
+#include "common.hxx"
+#include <utility>
+#include <functional>
 #include <spdlog/spdlog.h>
 #include <asio.hpp>
-#include <memory>
-#include <utility>
 #include <spdlog/fmt/bin_to_hex.h>
 
-using std::shared_ptr;
 using std::mutex;
-using std::vector;
-using std::make_shared;
-using std::enable_shared_from_this;
 using std::function;
-
-using spdlog::logger;
+using std::enable_shared_from_this;
 
 #define __SLEEP__ std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(10))
 
@@ -41,79 +37,70 @@ class asio_rpc_session;
 
 extern ptr<spdlog::logger> global_logger;
 
-typedef function<void(const shared_ptr<asio_rpc_session> &)> session_closed_callback;
-typedef function<shared_ptr<vector<uint8_t >>(const vector<uint8_t> &)> msg_handler;
+typedef function<void(const ptr<asio_rpc_session> &)> session_closed_callback;
+typedef function<ptr<bytes>(const bytes &)> request_handler;
 
 class asio_rpc_session : public enable_shared_from_this<asio_rpc_session> {
 public:
     template<typename SessionCloseCallback>
-    asio_rpc_session(ptr<asio::io_context> &io, msg_handler handler, SessionCloseCallback &&callback)
+    asio_rpc_session(ptr<asio::io_context> &io, request_handler handler, SessionCloseCallback &&callback)
             : handler_(std::move(handler)),
               socket_(*io),
               callback_(std::forward<SessionCloseCallback>(callback)),
-              data_size_(0) {}
+              payload_size_(0) {}
 
-
-public:
     ~asio_rpc_session() {
         if (socket_.is_open()) {
             socket_.close();
         }
     }
 
+    string local_address() {
+        return fmt::format("{}:{}", socket_.local_endpoint().address().to_string(), socket_.local_endpoint().port());
+    }
+
+    string remote_address() {
+        return fmt::format("{}:{}", socket_.remote_endpoint().address().to_string(), socket_.remote_endpoint().port());
+    }
+
     void start() {
-//        {
-//            auto remote = socket_.remote_endpoint();
-//            logger_->info("Connection from {}:{}", remote.address().to_string(), remote.port());
-//        }
+        read_header();
+    }
 
-        asio::error_code err;
-        do {
-            asio::read(socket_, asio::buffer(&data_size_, sizeof(uint32_t)), err);
-        } while (err == asio::error::eof);
+    void read_header() {
+        auto self = shared_from_this();
+        asio::async_read(socket_, request_, asio::transfer_exactly(sizeof(uint32_t)),
+                         [self](const asio::error_code &error, size_t bytes_read) {
+                             if (!error) {
+                                 std::istream in(&self->request_);
+                                 in.read(reinterpret_cast<char *>(&self->payload_size_), sizeof(uint32_t));
+                                 self->read_payload();
+                             } else {
+                                 global_logger->error("socket session (R {}, L {}) read error: {}",
+                                                      self->remote_address(), self->local_address(), error.message());
+                                 self->stop();
+                             }
+                         });
+    }
 
-        if (err) {
-            {
-                auto local_addr = fmt::format("{}:{}", socket_.local_endpoint().address().to_string(),
-                                              socket_.local_endpoint().port());
-
-                global_logger->error("{} {} {}: local={} - {}", __FILE__, __FUNCTION__, __LINE__,
-                                     local_addr, err.message());
-            }
-            this->stop();
-        }
-
-        if (data_size_ < 0 || data_size_ > 0x1000000) {
-            global_logger->warn("bad log data size in the header {}, stop this session to protect further corruption",
-                                data_size_);
-            this->stop();
-            return;
-        }
-
-        if (data_size_ == 0) {
-            this->read_complete();
-            return;
-        }
-
+    void read_payload() {
         message_buffer_.clear();
-        message_buffer_.resize((size_t) data_size_, 0);
-        global_logger->trace("{} {} {}: data_size = {}", __FILE__, __FUNCTION__, __LINE__, data_size_);
+        message_buffer_.resize((size_t) payload_size_, 0);
+        global_logger->trace("{} {} {}: data_size = {}", __FILE__, __FUNCTION__, __LINE__, payload_size_);
 
         asio::async_read(this->socket_, asio::buffer(message_buffer_),
                          std::bind(&asio_rpc_session::read_log_data, shared_from_this(),
-                                   std::placeholders::_1,
-                                   std::placeholders::_2));
+                                   std::placeholders::_1, std::placeholders::_2));
     }
 
     void stop() {
-        global_logger->trace("{} {} {}: TRACE", __BASE_FILE__, __FUNCTION__, __LINE__);
-
-        socket_.close();
+        global_logger->trace("{} {} {}: TRACE", __FILE__, __FUNCTION__, __LINE__);
+        if (socket_.is_open()) {
+            socket_.close();
+        }
         if (callback_) {
             callback_(this->shared_from_this());
         }
-
-        global_logger->trace("{} {} {}: TRACE", __BASE_FILE__, __FUNCTION__, __LINE__);
     }
 
     asio::ip::tcp::socket &socket() {
@@ -132,18 +119,9 @@ private:
     }
 
     void read_complete() {
-        // this part is for log
-        auto remote_addr = fmt::format("{}:{}",
-                                       socket_.remote_endpoint().address().to_string(),
-                                       socket_.remote_endpoint().port());
-        auto local_addr = fmt::format("{}:{}",
-                                      socket_.local_endpoint().address().to_string(),
-                                      socket_.local_endpoint().port());
-        // this part is for log
-
-        shared_ptr<asio_rpc_session> self = this->shared_from_this();
+        ptr<asio_rpc_session> self = this->shared_from_this();
         global_logger->trace("{} {}: {} <- {}  read {}", __FILE__, __LINE__,
-                             local_addr, remote_addr, spdlog::to_hex(message_buffer_));
+                             local_address(), remote_address(), spdlog::to_hex(message_buffer_));
 
         try {
             auto resp_buf = handler_(message_buffer_);
@@ -153,7 +131,7 @@ private:
                 global_logger->trace("{} {} {}: resp_size {}", __FILE__, __FUNCTION__, __LINE__,
                                      resp_buf->size());
                 global_logger->trace("{} {} {}: {} -> {} send {}", __FILE__, __FUNCTION__, __LINE__,
-                                     local_addr, remote_addr, spdlog::to_hex(*resp_buf));
+                                     local_address(), remote_address(), spdlog::to_hex(*resp_buf));
 
                 asio::write(socket_, asio::buffer(&length, sizeof(length)));
                 asio::async_write(
@@ -161,7 +139,7 @@ private:
                         asio::buffer(*resp_buf),
                         [this, self](asio::error_code err, size_t) -> void {
                             if (!err) {
-                                data_size_ = 0;
+                                payload_size_ = 0;
                                 start();
                             } else {
                                 global_logger->error("failed to send response to peer due to error {}", err.value());
@@ -180,10 +158,11 @@ private:
     }
 
 private:
-    msg_handler handler_;
+    request_handler handler_;
     asio::ip::tcp::socket socket_;
-    int32_t data_size_;
-    vector<uint8_t> message_buffer_;
+    asio::streambuf request_;
+    uint32_t payload_size_;
+    bytes message_buffer_;
     session_closed_callback callback_;
 };
 

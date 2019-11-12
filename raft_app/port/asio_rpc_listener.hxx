@@ -29,7 +29,6 @@
 
 using std::mutex;
 using std::lock_guard;
-using std::make_shared;
 using std::enable_shared_from_this;
 
 extern sgx_enclave_id_t global_enclave_id;
@@ -80,7 +79,7 @@ private:
         });
     }
 
-    void remove_session(const shared_ptr<asio_rpc_session> &session) {
+    void remove_session(const ptr<asio_rpc_session> &session) {
         lock_guard<mutex> lock(session_lock_);
 
         for (auto it = active_sessions_.begin(); it != active_sessions_.end(); ++it) {
@@ -96,7 +95,7 @@ private:
     asio::ip::tcp::acceptor acceptor_;
 
     mutex session_lock_;
-    vector<shared_ptr<asio_rpc_session>> active_sessions_;
+    vector<ptr<asio_rpc_session>> active_sessions_;
 };
 
 

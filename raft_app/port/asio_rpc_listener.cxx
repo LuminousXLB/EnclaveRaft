@@ -34,7 +34,7 @@ ptr<bytes> message_handler(const bytes &message) {
         return nullptr;
     }
 
-    auto buffer = make_shared<vector<uint8_t >>(resp_len, 0);
+    auto buffer = make_shared<bytes>(resp_len, 0);
     bool ret;
     ecall_fetch_rpc_response(global_enclave_id, &ret, uid, buffer->size(), &(*buffer)[0]);
 

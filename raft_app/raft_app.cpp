@@ -77,7 +77,7 @@ int main(int argc, char const *argv[]) {
         cpu_cnt = 1;
     }
 
-    cpu_cnt = 8;
+//    cpu_cnt = 8;
     vector<thread> thread_pool;
     for (unsigned int i = 0; i < cpu_cnt; ++i) {
         thread_pool.emplace_back([] {

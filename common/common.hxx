@@ -8,10 +8,12 @@
 #include <cstdint>
 #include <vector>
 #include <array>
+#include <string>
 #include <memory>
 
 using std::vector;
 using std::array;
+using std::string;
 using std::make_shared;
 
 static constexpr unsigned int S_KEY_SIZE = 32;
