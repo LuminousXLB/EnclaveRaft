@@ -21,13 +21,16 @@
 
 #include "common.hxx"
 #include <mutex>
+#include <atomic>
 #include <utility>
 #include <asio.hpp>
 #include <spdlog/spdlog.h>
 #include "raft_enclave_u.h"
 #include "asio_rpc_session.hxx"
 
+using std::map;
 using std::mutex;
+using std::atomic;
 using std::lock_guard;
 using std::enable_shared_from_this;
 
@@ -61,11 +64,14 @@ private:
         }
 
         auto self = shared_from_this();
-        auto session = make_shared<asio_rpc_session>(io_svc_,
+        uint32_t sid = (++session_cnt);
+        auto session = make_shared<asio_rpc_session>(sid, io_svc_,
                                                      &message_handler,
                                                      std::bind(&asio_rpc_listener::remove_session,
                                                                self,
                                                                std::placeholders::_1));
+
+        active_sessions_.insert(std::make_pair(sid, session));
 
         acceptor_.async_accept(session->socket(), [self, this, session](const asio::error_code &err) -> void {
             if (!err) {
@@ -79,23 +85,20 @@ private:
         });
     }
 
-    void remove_session(const ptr<asio_rpc_session> &session) {
+    void remove_session(uint32_t session_id) {
         lock_guard<mutex> lock(session_lock_);
-
-        for (auto it = active_sessions_.begin(); it != active_sessions_.end(); ++it) {
-            if (*it == session) {
-                active_sessions_.erase(it);
-                break;
-            }
+        auto it = active_sessions_.find(session_id);
+        if (it != active_sessions_.end()) {
+            active_sessions_.erase(it);
         }
     }
 
 private:
     ptr<asio::io_context> &io_svc_;
     asio::ip::tcp::acceptor acceptor_;
-
     mutex session_lock_;
-    vector<ptr<asio_rpc_session>> active_sessions_;
+    atomic<uint32_t> session_cnt;
+    map<uint32_t, ptr<asio_rpc_session>> active_sessions_;
 };
 
 

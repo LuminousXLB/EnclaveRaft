@@ -80,6 +80,8 @@ bufptr send(asio::io_context &io_ctx, uint16_t port, const bufptr &req_buf) {
     asio::write(s, req_sbuf, err);
     if (err) {
         spdlog::error("Error when writing message: {}", err.message());
+    } else {
+        spdlog::info("Message sent, reading response");
     }
 
     /* Reading message */
