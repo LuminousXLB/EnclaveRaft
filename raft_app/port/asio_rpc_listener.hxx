@@ -64,13 +64,12 @@ private:
         }
 
         auto self = shared_from_this();
-        uint32_t sid = (++session_cnt);
+        uint32_t sid = (++sid_counter);
         auto session = make_shared<asio_rpc_session>(sid, io_svc_,
                                                      &message_handler,
                                                      std::bind(&asio_rpc_listener::remove_session,
                                                                self,
                                                                std::placeholders::_1));
-
         active_sessions_.insert(std::make_pair(sid, session));
 
         acceptor_.async_accept(session->socket(), [self, this, session](const asio::error_code &err) -> void {
@@ -94,10 +93,10 @@ private:
     }
 
 private:
+    atomic<uint32_t> sid_counter{0};
     ptr<asio::io_context> &io_svc_;
     asio::ip::tcp::acceptor acceptor_;
     mutex session_lock_;
-    atomic<uint32_t> session_cnt;
     map<uint32_t, ptr<asio_rpc_session>> active_sessions_;
 };
 

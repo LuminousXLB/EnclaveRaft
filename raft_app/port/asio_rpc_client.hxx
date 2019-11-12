@@ -18,27 +18,21 @@
 #ifndef ENCLAVERAFT_ASIO_RPC_CLIENT_HXX
 #define ENCLAVERAFT_ASIO_RPC_CLIENT_HXX
 
+#include "common.hxx"
+#include "asio_log_utils.hxx"
+#include <functional>
+
 #include <asio.hpp>
 #include <spdlog/fmt/fmt.h>
-
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/bin_to_hex.h>
-#include <err.h>
 
-using std::vector;
-using std::string;
 using std::function;
-using std::shared_ptr;
-using std::make_shared;
 
 using tcp_resolver = asio::ip::tcp::resolver;
 
 extern sgx_enclave_id_t global_enclave_id;
-extern shared_ptr<spdlog::logger> global_logger;
+extern ptr<spdlog::logger> global_logger;
 
 class asio_rpc_client : public std::enable_shared_from_this<asio_rpc_client> {
 public:
@@ -51,9 +45,8 @@ public:
         }
     }
 
-public:
     void send(uint32_t request_uid, const uint8_t *message, int32_t size) {
-        req_map_[request_uid] = make_shared<vector<uint8_t >>(message, message + size);
+        req_map_[request_uid] = make_shared<bytes>(message, message + size);
 
         if (!socket_.is_open()) {
             query(request_uid);
@@ -72,45 +65,41 @@ private:
     }
 
     void query(uint32_t request_uid) {
+        auto self = shared_from_this();
         resolver_.async_resolve(tcp_resolver::query(host_, port_, tcp_resolver::query::all_matching),
-                                std::bind(&asio_rpc_client::connect, shared_from_this(),
-                                          request_uid,
-                                          std::placeholders::_1,
-                                          std::placeholders::_2));
+                                [self, request_uid](const asio::error_code &error,
+                                                    const tcp_resolver::iterator &iterator) {
+                                    if (!error) {
+                                        self->connect(request_uid, iterator);
+                                    } else {
+                                        self->handle_error(request_uid, error, "failed to resolve host");
+                                    }
+                                });
     }
 
-    void connect(uint32_t request_uid, asio::error_code err, const tcp_resolver::iterator &iter) {
-        if (!err) {
-            asio::async_connect(socket_, iter,
-                                std::bind(&asio_rpc_client::connected, shared_from_this(),
-                                          request_uid,
-                                          std::placeholders::_1,
-                                          std::placeholders::_2));
-        } else {
-            handle_error(request_uid, err, "failed to resolve host");
-        }
-    }
-
-    void connected(uint32_t request_uid, std::error_code err, const tcp_resolver::iterator &iter) {
-        if (!err) {
-            this->send_message(request_uid);
-        } else {
-            handle_error(request_uid, err, "failed to connect to remote socket");
-        }
+    void connect(uint32_t request_uid, const tcp_resolver::iterator &iter) {
+        auto self = shared_from_this();
+        asio::async_connect(socket_, iter,
+                            [self, request_uid](const std::error_code &error, const tcp_resolver::iterator &iter) {
+                                if (!error) {
+                                    self->send_message(request_uid);
+                                } else {
+                                    self->handle_error(request_uid, error, "failed to connect to remote socket");
+                                }
+                            });
     }
 
     void send_message(uint32_t request_uid) {
-        shared_ptr<vector<uint8_t >> req_buf = req_map_[request_uid];
+        ptr<bytes> req_buf = req_map_[request_uid];
 
         // this part is for log
-        auto local_addr = fmt::format("{}:{}",
-                                      socket_.local_endpoint().address().to_string(),
-                                      socket_.local_endpoint().port());
         global_logger->trace("{} {} {}: client={} request={} local={} size={} send {}",
                              __FILE__, __FUNCTION__, __LINE__,
-                             client_uid_, request_uid, local_addr, req_buf->size(),
+                             client_uid_, request_uid, socket_local_address(socket_), req_buf->size(),
                              spdlog::to_hex(*req_buf));
         // this part is for log
+
+
 
         asio::error_code err;
         int32_t size = req_buf->size();
@@ -156,7 +145,7 @@ private:
                              __FUNCTION__, __LINE__,
                              client_uid_, request_uid, bytes_read, data_size);
 
-        resp_map_[request_uid] = make_shared<vector<uint8_t >>(data_size, 0);
+        resp_map_[request_uid] = make_shared<bytes>(data_size, 0);
 
         asio::async_read(socket_, asio::buffer(*resp_map_[request_uid]),
                          std::bind(&asio_rpc_client::response_read, shared_from_this(),
@@ -200,8 +189,8 @@ private:
     std::string host_;
     std::string port_;
     uint32_t client_uid_;
-    std::map<uint32_t, shared_ptr<vector<uint8_t>>> req_map_;
-    std::map<uint32_t, shared_ptr<vector<uint8_t>>> resp_map_;
+    std::map<uint32_t, ptr<bytes>> req_map_;
+    std::map<uint32_t, ptr<bytes>> resp_map_;
 };
 
 

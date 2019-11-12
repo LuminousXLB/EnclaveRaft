@@ -22,11 +22,11 @@ using std::atomic;
 using std::mutex;
 using std::lock_guard;
 
-extern shared_ptr<asio::io_context> global_io_context;
+extern ptr<asio::io_context> global_io_context;
 
 static mutex rpc_client_pool_lock;
 static atomic<uint32_t> rpc_client_id_counter;
-static map<uint32_t, shared_ptr<asio_rpc_client>> rpc_client_pool;
+static map<uint32_t, ptr<asio_rpc_client>> rpc_client_pool;
 
 uint32_t ocall_rpc_client_create(const char *endpoint) {
     // the endpoint is expecting to be protocol://host:port, and we only support tcp for this factory
@@ -65,7 +65,7 @@ void ocall_rpc_client_close(uint32_t client_uid) {
 }
 
 void ocall_send_rpc_request(uint32_t client_uid, uint32_t size, const uint8_t *message, uint32_t request_uid) {
-    shared_ptr<asio_rpc_client> client = nullptr;
+    ptr<asio_rpc_client> client = nullptr;
     {
         lock_guard<mutex> lock(rpc_client_pool_lock);
         auto it = rpc_client_pool.find(client_uid);

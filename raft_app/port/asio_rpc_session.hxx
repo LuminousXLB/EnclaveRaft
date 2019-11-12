@@ -26,6 +26,8 @@
 #include <asio.hpp>
 #include <spdlog/fmt/bin_to_hex.h>
 
+#include "asio_log_utils.hxx"
+
 using std::mutex;
 using std::function;
 using std::enable_shared_from_this;
@@ -35,11 +37,12 @@ using std::enable_shared_from_this;
 // rpc session
 class asio_rpc_session;
 
-extern ptr<spdlog::logger> global_logger;
 
 typedef function<void(uint32_t)> session_closed_callback;
 typedef function<ptr<bytes>(const bytes &)> request_handler;
 static constexpr uint32_t request_header_size = sizeof(uint32_t);
+
+extern ptr<spdlog::logger> global_logger;
 
 class asio_rpc_session : public enable_shared_from_this<asio_rpc_session> {
 public:
@@ -54,28 +57,6 @@ public:
     ~asio_rpc_session() {
         if (socket_.is_open()) {
             socket_.close();
-        }
-    }
-
-    string local_address() {
-        asio::error_code error;
-        auto endpoint = socket_.local_endpoint(error);
-
-        if (!error) {
-            return fmt::format("{}:{}", endpoint.address().to_string(), endpoint.port());
-        } else {
-            return error.message();
-        }
-    }
-
-    string remote_address() {
-        asio::error_code error;
-        auto endpoint = socket_.remote_endpoint(error);
-
-        if (!error) {
-            return fmt::format("{}:{}", endpoint.address().to_string(), endpoint.port());
-        } else {
-            return error.message();
         }
     }
 
@@ -100,6 +81,14 @@ public:
     }
 
 private:
+    string local_address() {
+        return socket_local_address(socket_);
+    }
+
+    string remote_address() {
+        return socket_local_address(socket_);
+    }
+
     void handle_error(const string &description, const asio::error_code &error) {
         global_logger->error("socket session [{}] (R {}, L {}) {} error: {}",
                              session_id_, remote_address(), local_address(), description,
@@ -211,11 +200,13 @@ private:
 
 private:
     uint32_t session_id_;
-    request_handler handler_;
+
     asio::ip::tcp::socket socket_;
     uint32_t payload_size_;
     asio::streambuf request_;
     asio::streambuf response_;
+
+    request_handler handler_;
     session_closed_callback callback_;
 };
 
