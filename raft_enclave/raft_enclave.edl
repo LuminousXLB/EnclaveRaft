@@ -1,4 +1,5 @@
 enclave {
+    from "sgx_tsgxssl.edl" import *;
     from "sgx_tae_service.edl" import *;
     include "log_level.hxx"
     include "stdbool.h"

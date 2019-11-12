@@ -9,6 +9,7 @@
 #include "../raft/include/cornerstone.hxx"
 #include "rpc_listener_port.hxx"
 #include "msg_serializer.hxx"
+#include "crypto.hxx"
 
 #include <atomic>
 #include <map>
@@ -62,7 +63,9 @@ public:
 
     void send(ptr<req_msg> &req, rpc_handler &when_done) override {
         // FIXME: Encrypt & Decrypt
-        bufptr message_buffer = serialize_req(req);
+        bufptr req_buffer = serialize_req(req);
+
+        auto message_buffer = raft_encrypt(req_buffer->data(), req_buffer->size());
 
         uint32_t uid = 0;
         {

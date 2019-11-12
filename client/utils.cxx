@@ -3,7 +3,7 @@
 //
 
 #include "utils.hxx"
-
+#include "client_crypto.hxx"
 
 bufptr serialize_req(std::shared_ptr<req_msg> &req) {
     // serialize req, send and read response
@@ -52,11 +52,13 @@ std::shared_ptr<resp_msg> deserialize_resp(const bufptr &resp_buf) {
 }
 
 bufptr send(asio::io_context &io_ctx, uint16_t port, const bufptr &req_buf) {
-    auto resp_buf = buffer::alloc(RPC_RESP_HEADER_SIZE);
     uint32_t size = req_buf->size();
 
     spdlog::info("Sending message to {}: {}", port, size);
 
+    /* Encrypt request */
+    auto req = client_encrypt(req_buf->data(), req_buf->size());
+    size = req->size();
 
     tcp::socket s(io_ctx);
     tcp::resolver resolver(io_ctx);
@@ -67,28 +69,43 @@ bufptr send(asio::io_context &io_ctx, uint16_t port, const bufptr &req_buf) {
     spdlog::info("Socket Local {}:{} -> Remote {}:{}",
                  local.address().to_string(), local.port(), remote.address().to_string(), remote.port());
 
-    asio::error_code err;
-    asio::write(s, asio::buffer(&size, sizeof(uint32_t)), err);
-    if (err) {
-        spdlog::error("Error when writing header: {}", err.message());
-    }
+    /* Sending message */
+    asio::streambuf req_sbuf;
+    std::ostream out(&req_sbuf);
 
-    asio::write(s, asio::buffer(req_buf->data(), req_buf->size()), err);
+    out.write(reinterpret_cast<const char *>(&size), sizeof(uint32_t));
+    out.write(reinterpret_cast<const char *>(req->data()), req->size());
+
+    asio::error_code err;
+    asio::write(s, req_sbuf, err);
     if (err) {
         spdlog::error("Error when writing message: {}", err.message());
     }
 
-    asio::read(s, asio::buffer(&size, sizeof(uint32_t)), err);
-    if (err) {
+    /* Reading message */
+    asio::streambuf resp_sbuf;
+    std::istream in(&resp_sbuf);
+
+    asio::read(s, resp_sbuf, asio::transfer_at_least(sizeof(uint32_t)), err);
+    if (err && err != asio::error::eof) {
         spdlog::error("Error when reading header: {}", err.message());
     }
+    in.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
 
-    size_t reply_length = asio::read(s, asio::buffer(resp_buf->data(), resp_buf->size()), err);
-    if (err) {
+    while (resp_sbuf.size() < size && !err) {
+        asio::read(s, resp_sbuf, asio::transfer_at_least(1), err);
+    }
+    if (err && err != asio::error::eof) {
         spdlog::error("Error when reading message: {}", err.message());
     }
 
-    spdlog::info("Fetched reply from {}: {}", port, reply_length);
+    /* Decrypting message */
+    auto resp = client_decrypt(reinterpret_cast<const uint8_t *>(resp_sbuf.data().data()), size);
+
+    auto resp_buf = buffer::alloc(RPC_RESP_HEADER_SIZE);
+    memcpy(resp_buf->data(), resp->data(), resp->size());
+
+    spdlog::info("Fetched reply from {}: {}", port, resp->size());
 
     s.close();
 

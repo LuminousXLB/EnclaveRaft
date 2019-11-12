@@ -8,9 +8,11 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 find_package(SGX REQUIRED)
 include_directories(${SGX_INCLUDE_DIR})
 
-##### spdlog ##########################################################################################################
+##### third_pary ######################################################################################################
 
 add_subdirectory(third_party/spdlog-1.4.2)
+add_subdirectory(third_party/cppcodec-0.2)
+include_directories(third_party/cppcodec-0.2)
 
 #######################################################################################################################
 
@@ -18,6 +20,9 @@ add_subdirectory(raft_app/sgx_utils)
 include_directories(raft_app/sgx_utils)
 
 include_directories(common)
+set(T_COMMON_SRCS common/aes_ctr_crypto.cxx)
+set(U_COMMON_SRCS "")
+set(C_COMMON_SRCS common/aes_ctr_crypto.cxx)
 
 #######################################################################################################################
 file(GLOB T_CORNERSTONE_SRCS raft_enclave/raft/src/*.cxx)
@@ -28,7 +33,7 @@ set(EDL_SEARCH_PATHS raft_enclave)
 
 # build enclave library
 add_enclave_library(Enclave_raft
-        SRCS raft_enclave/raft_enclave.cpp ${T_CORNERSTONE_SRCS} ${T_SGX_PORT_SRCS} ${T_RAFT_LOGSTORE_SRCS}
+        SRCS raft_enclave/raft_enclave.cpp ${T_COMMON_SRCS} ${T_CORNERSTONE_SRCS} ${T_SGX_PORT_SRCS} ${T_RAFT_LOGSTORE_SRCS}
         EDL raft_enclave/raft_enclave.edl
         EDL_SEARCH_PATHS raft_enclave)
 target_include_directories(Enclave_raft PRIVATE ${SGXSSL_INCLUDE_DIR})
@@ -46,7 +51,7 @@ file(GLOB U_SGX_PORT_SRCS raft_app/port/*.cxx)
 
 # build untrusted executable to run with enclave
 add_untrusted_executable(App_raft
-        SRCS raft_app/raft_app.cpp ${U_SGX_PORT_SRCS}
+        SRCS raft_app/raft_app.cpp ${U_COMMON_SRCS} ${U_SGX_PORT_SRCS}
         EDL raft_enclave/raft_enclave.edl
         EDL_SEARCH_PATHS raft_enclave)
 
@@ -58,10 +63,12 @@ add_dependencies(App_raft Enclave_raft-sign)
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/logs")
 
 #######################################################################################################################
+find_package(OpenSSL)
 
 file(GLOB TEST_CLIENT_SRCS client/*.cxx)
 
-add_executable(client ${TEST_CLIENT_SRCS} raft_enclave/raft/src/buffer.cxx)
-target_link_libraries(client spdlog::spdlog pthread)
+add_executable(client ${TEST_CLIENT_SRCS} ${C_COMMON_SRCS} raft_enclave/raft/src/buffer.cxx)
+target_link_libraries(client PRIVATE OpenSSL::Crypto)
+target_link_libraries(client PRIVATE spdlog::spdlog)
 target_include_directories(client PRIVATE third_party/spdlog-1.4.2/include)
 target_include_directories(client PRIVATE third_party/asio-1.12.2/include)

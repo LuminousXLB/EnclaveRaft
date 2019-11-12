@@ -29,9 +29,11 @@ void ecall_rpc_response(uint32_t req_uid, uint32_t size, const uint8_t *msg, con
     ptr<rpc_exception> except;
 
     if (!exception) {
-        bufptr resp_buf(buffer::alloc(RPC_RESP_HEADER_SIZE));
         // FIXME: Encrypt & Decrypt
-        memcpy_s(resp_buf->data(), resp_buf->size(), msg, size);
+        shared_ptr<vector<uint8_t >> message_buffer = raft_decrypt(msg, size);
+
+        bufptr resp_buf = buffer::alloc(RPC_RESP_HEADER_SIZE);
+        memcpy_s(resp_buf->data(), resp_buf->size(), message_buffer->data(), message_buffer->size());
 
         rsp = deserialize_resp(resp_buf);
     } else {
