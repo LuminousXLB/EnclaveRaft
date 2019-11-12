@@ -10,6 +10,7 @@
 #include "rpc_listener_port.hxx"
 #include "msg_serializer.hxx"
 #include "crypto.hxx"
+#include "../system/message.hxx"
 
 #include <atomic>
 #include <map>

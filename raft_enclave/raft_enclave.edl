@@ -1,6 +1,10 @@
 enclave {
     from "sgx_tsgxssl.edl" import *;
     from "sgx_tae_service.edl" import *;
+  	from "sgx_tkey_exchange.edl" import *;
+
+	include "sgx_trts.h"
+	include "sgx_key_exchange.h"
     include "log_level.hxx"
     include "stdbool.h"
 
@@ -19,6 +23,8 @@ enclave {
         /* asio_rpc_client.hxx => rpc_client_port.cxx */
         public void ecall_rpc_response(uint32_t req_uid, uint32_t size, [in, size=size] const uint8_t *msg, [in, string] const char *exception);
 
+        /* attestation */
+        public sgx_status_t ecall_get_report([in] sgx_target_info_t *target_info, [out] sgx_report_t *report);
     };
 
     untrusted {

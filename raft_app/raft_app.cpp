@@ -5,11 +5,17 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <memory>
+#include <string>
+#include "system/enclave_quote.hxx"
+#include "system/intel_ias.hxx"
+#include "secret.h"
+#include "cppcodec/base64_default_rfc4648.hpp"
 
 using std::shared_ptr;
 using std::make_shared;
 using std::vector;
 using std::thread;
+using std::string;
 
 /* Global Enclave ID */
 sgx_enclave_id_t global_enclave_id;
@@ -30,7 +36,6 @@ int main(int argc, char const *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-
     global_io_context = make_shared<asio::io_context>();
     global_logger = spdlog::stdout_color_mt("raft");
     global_logger->set_level(spdlog::level::trace);
@@ -43,6 +48,14 @@ int main(int argc, char const *argv[]) {
     }
 
     sgx_status_t status;
+
+    auto quote = get_enclave_quote();
+    IntelIAS ias(intel_api_primary, intel_api_secondary, IntelIAS::DEVELOPMENT);
+    string att_report = ias.report(base64::encode(*quote));
+
+    std::cout << att_report << std::endl;
+
+//    exit(-1);
 
     status = ecall_raft_instance_run(global_enclave_id, srv_id, "127.0.0.1", 9000 + srv_id);
     if (status != SGX_SUCCESS) {
