@@ -13,8 +13,7 @@
 using std::string;
 using std::array;
 using std::vector;
-using std::unique_ptr;
-using std::make_unique;
+using std::make_shared;
 
 using json11::Json;
 
@@ -56,7 +55,7 @@ public:
         request += body;
         request += "\r\n";
 
-        connection_ = make_unique<ssl_client>(io_context_, ssl_context_, host, protocol);
+        connection_ = make_shared<ssl_client>(io_context_, ssl_context_, host, protocol);
         return connection_->request(reinterpret_cast<const uint8_t *>(request.data()), request.size());
     }
 
@@ -76,7 +75,7 @@ private:
     ENVIRONMENT env_;
     asio::io_context io_context_;
     asio::ssl::context ssl_context_;
-    unique_ptr<ssl_client> connection_;
+    ptr<ssl_client> connection_;
     array<string, 2> key;
 };
 

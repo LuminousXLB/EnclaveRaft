@@ -1,31 +1,39 @@
+
+/* std */
+#include "common.hxx"
 #include <cstdio>
+
+/* sgx */
 #include "raft_enclave_u.h"
 #include "sgx_utils/sgx_utils.h"
+
+/* io */
 #include <asio.hpp>
+#include "cppcodec/base64_default_rfc4648.hpp"
+#include "unquote.hxx"
+
+/* log */
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <memory>
-#include <string>
+
+/* app */
 #include "system/enclave_quote.hxx"
 #include "system/intel_ias.hxx"
 #include "secret.h"
-#include "cppcodec/base64_default_rfc4648.hpp"
 
-using std::shared_ptr;
+
 using std::make_shared;
-using std::vector;
 using std::thread;
-using std::string;
 
 /* Global Enclave ID */
 sgx_enclave_id_t global_enclave_id;
-shared_ptr<asio::io_context> global_io_context;
-shared_ptr<spdlog::logger> global_logger;
-
+ptr<asio::io_context> global_io_context;
+ptr<spdlog::logger> global_logger;
+string attestation_verification_report;
 
 int main(int argc, char const *argv[]) {
+    /* Load CMD Parameter */
     uint8_t srv_id = 1;
-
     if (argc < 2) {
         // do nothing
     } else if (argc == 2) {
@@ -36,12 +44,13 @@ int main(int argc, char const *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    /* Initialize Global Items */
     global_io_context = make_shared<asio::io_context>();
     global_logger = spdlog::stdout_color_mt("raft");
     global_logger->set_level(spdlog::level::trace);
     global_logger->set_pattern("%^[%H:%M:%S.%f] @ %t [%l]%$ %v");
 
-    /* Enclave Initialization */
+    /* Initialize Enclave */
     if (initialize_enclave(&global_enclave_id, "raft_enclave.token", "Enclave_raft.signed.so") < 0) {
         printf("Fail to initialize enclave.\n");
         return 1;
@@ -49,26 +58,38 @@ int main(int argc, char const *argv[]) {
 
     sgx_status_t status;
 
-    auto quote = get_enclave_quote();
-    IntelIAS ias(intel_api_primary, intel_api_secondary, IntelIAS::DEVELOPMENT);
-    string att_report = ias.report(base64::encode(*quote));
-
-    std::cout << att_report << std::endl;
+    /* Get Remote Attestation Verification Report */
+//    auto quote = get_enclave_quote();
+//    IntelIAS ias(intel_api_primary, intel_api_secondary, IntelIAS::DEVELOPMENT);
+//    string att_report = ias.report(base64::encode(*quote));
+//    const auto &headers = ias.response_headers();
+//
+//    Json attestation_report = Json::object{
+//            {"certificates", url_decode(headers.find("X-IASReport-Signing-Certificate")->second)},
+//            {"signature",    headers.find("X-IASReport-Signature")->second},
+//            {"body",         base64::encode(att_report)}
+//    };
+//
+//    std::cout << attestation_report.dump() << std::endl;
 
 //    exit(-1);
 
+    /* run raft instance */
     status = ecall_raft_instance_run(global_enclave_id, srv_id, "127.0.0.1", 9000 + srv_id);
     if (status != SGX_SUCCESS) {
         print_error_message(status);
         exit(EXIT_FAILURE);
     }
 
+    /* multi-thread run */
     unsigned int cpu_cnt = std::thread::hardware_concurrency();
 
-    thread t(std::bind(ecall_raft_instance_commit_bg, global_enclave_id));
+    /* commit in bg */
+    thread t([=] { ecall_raft_instance_commit_bg(global_enclave_id); });
     t.detach();
     cpu_cnt -= 1;
 
+    /* others */
     if (cpu_cnt < 1) {
         cpu_cnt = 1;
     }

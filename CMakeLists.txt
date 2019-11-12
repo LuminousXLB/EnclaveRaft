@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(EnclaveRaft)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 
 # Intel SGX
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
