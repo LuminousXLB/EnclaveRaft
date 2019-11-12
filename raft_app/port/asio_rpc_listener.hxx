@@ -19,53 +19,29 @@
 #ifndef ENCLAVERAFT_ASIO_RPC_LISTENER_HXX
 #define ENCLAVERAFT_ASIO_RPC_LISTENER_HXX
 
+#include "common.hxx"
 #include <mutex>
 #include <utility>
-#include <vector>
-#include <memory>
-#include "raft_enclave_u.h"
 #include <asio.hpp>
 #include <spdlog/spdlog.h>
-#include "rpc_session.hxx"
+#include "raft_enclave_u.h"
+#include "asio_rpc_session.hxx"
 
-using std::shared_ptr;
 using std::mutex;
 using std::lock_guard;
-using std::vector;
 using std::make_shared;
 using std::enable_shared_from_this;
 
 extern sgx_enclave_id_t global_enclave_id;
 
-
-shared_ptr<vector<uint8_t>> message_handler(const vector<uint8_t> &message) {
-    spdlog::trace("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, message.size());
-
-    uint32_t uid;
-    int32_t resp_len;
-    ecall_handle_rpc_request(global_enclave_id, &resp_len, message.size(), message.data(), &uid);
-
-    if (resp_len == 0) {
-        return nullptr;
-    }
-
-    auto buffer = make_shared<vector<uint8_t >>(resp_len, 0);
-    bool ret;
-    ecall_fetch_rpc_response(global_enclave_id, &ret, uid, buffer->size(), &(*buffer)[0]);
-
-    if (ret) {
-        return buffer;
-    } else {
-        return nullptr;
-    }
-}
+ptr<bytes> message_handler(const bytes &message);
 
 // rpc listener implementation
 class asio_rpc_listener : public enable_shared_from_this<asio_rpc_listener> {
 public:
-    asio_rpc_listener(asio::io_service &io, uint16_t port, shared_ptr<logger> p_logger)
-            : io_svc_(io), acceptor_(io, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
-              active_sessions_(), session_lock_(), logger_(std::move(p_logger)) {}
+    asio_rpc_listener(ptr<asio::io_context> &io, uint16_t port)
+            : io_svc_(io), acceptor_(*io, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
+              active_sessions_(), session_lock_() {}
 
 public:
     void stop() {
@@ -74,7 +50,7 @@ public:
 
     void listen() {
         auto local = acceptor_.local_endpoint();
-        logger_->info("listening at {}:{}", local.address().to_string(), local.port());
+        global_logger->info("listening at {}:{}", local.address().to_string(), local.port());
 
         start();
     }
@@ -86,26 +62,25 @@ private:
         }
 
         auto self = shared_from_this();
-        auto session = make_shared<rpc_session>(io_svc_,
-                                                &message_handler,
-                                                logger_,
-                                                std::bind(&asio_rpc_listener::remove_session,
-                                                          self,
-                                                          std::placeholders::_1));
+        auto session = make_shared<asio_rpc_session>(io_svc_,
+                                                     &message_handler,
+                                                     std::bind(&asio_rpc_listener::remove_session,
+                                                               self,
+                                                               std::placeholders::_1));
 
         acceptor_.async_accept(session->socket(), [self, this, session](const asio::error_code &err) -> void {
             if (!err) {
-                this->logger_->debug("receive a incoming rpc connection");
+                global_logger->debug("receive a incoming rpc connection");
                 session->start();
             } else {
-                this->logger_->debug("fails to accept a rpc connection due to error {}", err.value());
+                global_logger->debug("fails to accept a rpc connection due to error {}", err.value());
             }
 
             this->start();
         });
     }
 
-    void remove_session(const shared_ptr<rpc_session> &session) {
+    void remove_session(const shared_ptr<asio_rpc_session> &session) {
         lock_guard<mutex> lock(session_lock_);
 
         for (auto it = active_sessions_.begin(); it != active_sessions_.end(); ++it) {
@@ -117,13 +92,11 @@ private:
     }
 
 private:
-    asio::io_service &io_svc_;
+    ptr<asio::io_context> &io_svc_;
     asio::ip::tcp::acceptor acceptor_;
 
     mutex session_lock_;
-    vector<shared_ptr<rpc_session>> active_sessions_;
-
-    shared_ptr<logger> logger_;
+    vector<shared_ptr<asio_rpc_session>> active_sessions_;
 };
 
 

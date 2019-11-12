@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(EnclaveRaft)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 
 # Intel SGX
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
@@ -13,8 +13,6 @@ include_directories(${SGX_INCLUDE_DIR})
 add_subdirectory(third_party/spdlog-1.4.2)
 add_subdirectory(third_party/cppcodec-0.2)
 include_directories(third_party/cppcodec-0.2)
-add_subdirectory(third_party/json11)
-include_directories(third_party/json11)
 
 #######################################################################################################################
 
@@ -59,7 +57,7 @@ add_untrusted_executable(App_raft
         EDL raft_enclave/raft_enclave.edl
         EDL_SEARCH_PATHS raft_enclave)
 
-target_link_libraries(App_raft sgx_utils spdlog::spdlog json11 OpenSSL::SSL)
+target_link_libraries(App_raft sgx_utils spdlog::spdlog OpenSSL::SSL)
 target_include_directories(App_raft PRIVATE third_party/spdlog-1.4.2/include)
 target_include_directories(App_raft PRIVATE third_party/asio-1.12.2/include)
 

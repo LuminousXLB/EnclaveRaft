@@ -6,19 +6,41 @@
 #include "asio_rpc_listener.hxx"
 #include "raft_enclave_u.h"
 
-extern shared_ptr<asio::io_context> global_io_context;
-extern shared_ptr<spdlog::logger> global_logger;
+extern ptr<asio::io_context> global_io_context;
 
-static shared_ptr<asio_rpc_listener> listener;
+extern ptr<asio_rpc_listener> global_rpc_listener;
 
 void ocall_rpc_listener_create(uint16_t port) {
-    global_logger->trace("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, port);
-
-    listener = make_shared<asio_rpc_listener>(*global_io_context, port, global_logger);
-    listener->listen();
+//    global_logger->trace("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, port);
+//    global_rpc_listener = make_shared<asio_rpc_listener>(global_io_context, port);
+//    global_logger->trace("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, port);
+//    listener->listen();
 }
 
 void ocall_rpc_listener_stop() {
     global_logger->trace("{} {} {}", __FILE__, __FUNCTION__, __LINE__);
-    listener->stop();
+    global_rpc_listener->stop();
+}
+
+
+ptr<bytes> message_handler(const bytes &message) {
+    spdlog::trace("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, message.size());
+
+    uint32_t uid;
+    int32_t resp_len;
+    ecall_handle_rpc_request(global_enclave_id, &resp_len, message.size(), message.data(), &uid);
+
+    if (resp_len == 0) {
+        return nullptr;
+    }
+
+    auto buffer = make_shared<vector<uint8_t >>(resp_len, 0);
+    bool ret;
+    ecall_fetch_rpc_response(global_enclave_id, &ret, uid, buffer->size(), &(*buffer)[0]);
+
+    if (ret) {
+        return buffer;
+    } else {
+        return nullptr;
+    }
 }

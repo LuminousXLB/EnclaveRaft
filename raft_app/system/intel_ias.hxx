@@ -8,18 +8,15 @@
 #include "ssl_client.hxx"
 #include "common.hxx"
 #include <memory>
-#include "json11.hpp"
 
 using std::string;
 using std::array;
 using std::vector;
-using std::unique_ptr;
-using std::make_unique;
-
-using json11::Json;
+using std::make_shared;
 
 static const char *host = "api.trustedservices.intel.com";
 static const char *protocol = "https";
+extern ptr<asio::io_context> global_io_context;
 
 class IntelIAS {
 public:
@@ -32,18 +29,17 @@ public:
     IntelIAS(const string &primary_key, const string &secondary_key, ENVIRONMENT env = DEVELOPMENT)
             : env_(env),
               key({primary_key, secondary_key}),
-              io_context_(),
-              ssl_context_(asio::ssl::context::sslv23) {
+              io_context_(global_io_context),
+              ssl_context_(make_shared<asio::ssl::context>(asio::ssl::context::sslv23)) {
 
-        ssl_context_.load_verify_file("/etc/ssl/certs/ca-certificates.crt");
+        ssl_context_->load_verify_file("/etc/ssl/certs/ca-certificates.crt");
 
     }
 
     string report(const string &isvEnclaveQuote_b64) {
         const char *path = (env_ == PRODUCTION) ? "/sgx/attestation/v3/report" : "/sgx/dev/attestation/v3/report";
-        const string body = Json(Json::object{
-                {"isvEnclaveQuote", isvEnclaveQuote_b64}
-        }).dump();
+        const string body = R"({"isvEnclaveQuote": ")" + isvEnclaveQuote_b64 + R"("})";
+
         uint8_t key_index = 0;
 
         string request;
@@ -56,7 +52,9 @@ public:
         request += body;
         request += "\r\n";
 
-        connection_ = make_unique<ssl_client>(io_context_, ssl_context_, host, protocol);
+
+
+        connection_ = make_shared<ssl_client>(*io_context_, *ssl_context_, host, protocol);
         return connection_->request(reinterpret_cast<const uint8_t *>(request.data()), request.size());
     }
 
@@ -74,9 +72,9 @@ public:
 
 private:
     ENVIRONMENT env_;
-    asio::io_context io_context_;
-    asio::ssl::context ssl_context_;
-    unique_ptr<ssl_client> connection_;
+    ptr<asio::io_context> io_context_;
+    ptr<asio::ssl::context> ssl_context_;
+    ptr<ssl_client> connection_;
     array<string, 2> key;
 };
 

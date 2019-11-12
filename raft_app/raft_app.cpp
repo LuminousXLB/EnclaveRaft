@@ -10,6 +10,7 @@
 #include "system/intel_ias.hxx"
 #include "secret.h"
 #include "cppcodec/base64_default_rfc4648.hpp"
+#include "port/asio_rpc_listener.hxx"
 
 using std::shared_ptr;
 using std::make_shared;
@@ -21,7 +22,7 @@ using std::string;
 sgx_enclave_id_t global_enclave_id;
 shared_ptr<asio::io_context> global_io_context;
 shared_ptr<spdlog::logger> global_logger;
-
+ptr<asio_rpc_listener> global_rpc_listener;
 
 int main(int argc, char const *argv[]) {
     uint8_t srv_id = 1;
@@ -40,6 +41,7 @@ int main(int argc, char const *argv[]) {
     global_logger = spdlog::stdout_color_mt("raft");
     global_logger->set_level(spdlog::level::trace);
     global_logger->set_pattern("%^[%H:%M:%S.%f] @ %t [%l]%$ %v");
+    global_rpc_listener = make_shared<asio_rpc_listener>(global_io_context, 9000 + srv_id);
 
     /* Enclave Initialization */
     if (initialize_enclave(&global_enclave_id, "raft_enclave.token", "Enclave_raft.signed.so") < 0) {
@@ -62,6 +64,8 @@ int main(int argc, char const *argv[]) {
         print_error_message(status);
         exit(EXIT_FAILURE);
     }
+
+    global_rpc_listener->listen();
 
     unsigned int cpu_cnt = std::thread::hardware_concurrency();
 
