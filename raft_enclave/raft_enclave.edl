@@ -39,8 +39,8 @@ enclave {
         void ocall_cancel_delayed_task(uint64_t task_uid);
 
         /* rpc_listener_port.hxx => asio_rpc_listener.cxx */
-        void ocall_rpc_listener_create(uint16_t port);
-        void ocall_rpc_listener_stop();
+        // void ocall_rpc_listener_create(uint16_t port);
+        // void ocall_rpc_listener_stop();
 
         /* rpc_client_port.hxx => asio_rpc_client.cxx */
         uint32_t ocall_rpc_client_create([in, string] const char *endpoint);

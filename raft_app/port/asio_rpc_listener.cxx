@@ -10,17 +10,17 @@ extern ptr<asio::io_context> global_io_context;
 
 extern ptr<asio_rpc_listener> global_rpc_listener;
 
-void ocall_rpc_listener_create(uint16_t port) {
+//void ocall_rpc_listener_create(uint16_t port) {
 //    global_logger->trace("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, port);
 //    global_rpc_listener = make_shared<asio_rpc_listener>(global_io_context, port);
 //    global_logger->trace("{} {} {}: {}", __FILE__, __FUNCTION__, __LINE__, port);
 //    listener->listen();
-}
+//}
 
-void ocall_rpc_listener_stop() {
-    global_logger->trace("{} {} {}", __FILE__, __FUNCTION__, __LINE__);
-    global_rpc_listener->stop();
-}
+//void ocall_rpc_listener_stop() {
+//    global_logger->trace("{} {} {}", __FILE__, __FUNCTION__, __LINE__);
+//    global_rpc_listener->stop();
+//}
 
 
 ptr<bytes> message_handler(const bytes &message) {

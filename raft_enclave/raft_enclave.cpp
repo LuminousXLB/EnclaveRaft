@@ -1,5 +1,6 @@
 #include "raft_enclave_t.h"
 
+#include "common.hxx"
 #include "raft/include/cornerstone.hxx"
 #include "port/logger_port.hxx"
 #include "port/service_port.hxx"
@@ -7,8 +8,6 @@
 #include "app_impl/in_memory_state_mgr.hxx"
 #include "app_impl/echo_state_machine.hxx"
 
-using std::make_shared;
-using std::shared_ptr;
 using std::pair;
 using std::make_pair;
 
@@ -23,18 +22,18 @@ using cornerstone::context;
 using cornerstone::raft_server;
 using cornerstone::sstrfmt;
 
-using raft_app_context  = pair<shared_ptr<raft_server>, shared_ptr<rpc_listener>>;
+using raft_app_context = pair<ptr<raft_server>, ptr<rpc_listener>>;
 
-static shared_ptr<raft_server> g_server = nullptr;
-static shared_ptr<rpc_listener> g_listener = nullptr;
-shared_ptr<logger> p_logger;
+static ptr<raft_server> g_server = nullptr;
+static ptr<rpc_listener> g_listener = nullptr;
+ptr<logger> p_logger;
 
 raft_app_context run_raft_instance(int srv_id, const string &endpoint, uint16_t port) {
     p_logger = make_shared<LoggerPort>();
 
-    shared_ptr<rpc_listener> p_listener = make_shared<RpcListenerPort>(port);
-    shared_ptr<state_mgr> p_manager = make_shared<in_memory_state_mgr>(srv_id, endpoint);
-    shared_ptr<state_machine> p_machine = make_shared<echo_state_machine>();
+    ptr<rpc_listener> p_listener = make_shared<RpcListenerPort>(port);
+    ptr<state_mgr> p_manager = make_shared<in_memory_state_mgr>(srv_id, endpoint);
+    ptr<state_machine> p_machine = make_shared<echo_state_machine>();
 
     auto *p_params = new raft_params;
     p_params->with_election_timeout_lower(500)
@@ -44,8 +43,8 @@ raft_app_context run_raft_instance(int srv_id, const string &endpoint, uint16_t 
             .with_rpc_failure_backoff(50);
 
     auto p_service = make_shared<ServicePort>();
-    shared_ptr<delayed_task_scheduler> p_scheduler = p_service;
-    shared_ptr<rpc_client_factory> p_client_factory = p_service;
+    ptr<delayed_task_scheduler> p_scheduler = p_service;
+    ptr<rpc_client_factory> p_client_factory = p_service;
 
     auto *p_context = new context(
             p_manager,

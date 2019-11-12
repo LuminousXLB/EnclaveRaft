@@ -22,11 +22,11 @@ public:
 
     void listen(ptr<msg_handler> &handler) override {
         rpc_listener_req_handler = handler;
-        ocall_rpc_listener_create(port_);
+//        ocall_rpc_listener_create(port_);
     }
 
     void stop() override {
-        ocall_rpc_listener_stop();
+//        ocall_rpc_listener_stop();
     }
 
 private:
