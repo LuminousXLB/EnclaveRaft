@@ -13,6 +13,8 @@ include_directories(${SGX_INCLUDE_DIR})
 add_subdirectory(third_party/spdlog-1.4.2)
 add_subdirectory(third_party/cppcodec-0.2)
 include_directories(third_party/cppcodec-0.2)
+add_subdirectory(third_party/json11)
+include_directories(third_party/json11)
 
 #######################################################################################################################
 
@@ -34,10 +36,11 @@ set(EDL_SEARCH_PATHS raft_enclave)
 
 # build enclave library
 add_enclave_library(Enclave_raft
-        SRCS raft_enclave/raft_enclave.cpp ${T_COMMON_SRCS} ${T_CORNERSTONE_SRCS} ${T_SGX_PORT_SRCS} ${T_RAFT_LOGSTORE_SRCS} ${T_SGX_SYSTEM_SRCS}
+        SRCS raft_enclave/raft_enclave.cpp ${T_COMMON_SRCS} ${T_CORNERSTONE_SRCS} ${T_SGX_PORT_SRCS} ${T_RAFT_LOGSTORE_SRCS} ${T_SGX_SYSTEM_SRCS} third_party/json11/json11.cpp
         EDL raft_enclave/raft_enclave.edl
         EDL_SEARCH_PATHS raft_enclave)
 target_include_directories(Enclave_raft PRIVATE ${SGXSSL_INCLUDE_DIR})
+#target_link_libraries(Enclave_raft json11)
 #include_directories(raft_enclave)
 
 # sign the enclave, according to configurations one-step or two-step signing will be performed.
@@ -57,7 +60,7 @@ add_untrusted_executable(App_raft
         EDL raft_enclave/raft_enclave.edl
         EDL_SEARCH_PATHS raft_enclave)
 
-target_link_libraries(App_raft sgx_utils spdlog::spdlog OpenSSL::SSL)
+target_link_libraries(App_raft sgx_utils spdlog::spdlog OpenSSL::SSL json11)
 target_include_directories(App_raft PRIVATE third_party/spdlog-1.4.2/include)
 target_include_directories(App_raft PRIVATE third_party/asio-1.12.2/include)
 
@@ -72,5 +75,6 @@ file(GLOB TEST_CLIENT_SRCS client/*.cxx)
 add_executable(client ${TEST_CLIENT_SRCS} ${C_COMMON_SRCS} raft_enclave/raft/src/buffer.cxx)
 target_link_libraries(client PRIVATE OpenSSL::Crypto)
 target_link_libraries(client PRIVATE spdlog::spdlog)
+target_link_libraries(client PRIVATE json11)
 target_include_directories(client PRIVATE third_party/spdlog-1.4.2/include)
 target_include_directories(client PRIVATE third_party/asio-1.12.2/include)

@@ -5,27 +5,26 @@
 #ifndef ENCLAVERAFT_RPC_CLIENT_PORT_HXX
 #define ENCLAVERAFT_RPC_CLIENT_PORT_HXX
 
+#include "common.hxx"
+#include <map>
+#include <atomic>
+#include <mutex>
+
 #include "raft_enclave_t.h"
 #include "../raft/include/cornerstone.hxx"
 #include "rpc_listener_port.hxx"
 #include "msg_serializer.hxx"
 #include "crypto.hxx"
-#include "../system/message.hxx"
+#include "messages.hxx"
 
-#include <atomic>
-#include <map>
-#include <mutex>
-
-using std::string;
-using std::atomic;
 using std::map;
-using std::mutex;
-using std::lock_guard;
 using std::pair;
 using std::make_pair;
+using std::atomic;
+using std::mutex;
+using std::lock_guard;
 
 using cornerstone::rpc_client;
-using cornerstone::ptr;
 using cornerstone::buffer;
 using cornerstone::bufptr;
 using cornerstone::req_msg;
@@ -42,6 +41,9 @@ extern atomic<uint32_t> last_req_uid_;
 static uint32_t rpc_client_create(const string &endpoint) {
     uint32_t ret_val;
     sgx_status_t status = ocall_rpc_client_create(&ret_val, endpoint.c_str());
+    if (status != SGX_SUCCESS) {
+        p_logger->err(lstrfmt("ocall_rpc_client_create failed: %04x").fmt(status));
+    }
     return ret_val;
 }
 
@@ -63,10 +65,15 @@ public:
     }
 
     void send(ptr<req_msg> &req, rpc_handler &when_done) override {
-        // FIXME: Encrypt & Decrypt
+        p_logger->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+
         bufptr req_buffer = serialize_req(req);
 
+        // FIXME: Encrypt
         auto message_buffer = raft_encrypt(req_buffer->data(), req_buffer->size());
+        uint16_t type = raft_message;
+        auto *ptr = reinterpret_cast<uint8_t *>(&type);
+        message_buffer->insert(message_buffer->begin(), ptr, ptr + sizeof(uint16_t));
 
         uint32_t uid = 0;
         {

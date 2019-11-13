@@ -21,6 +21,8 @@
 using namespace cornerstone;
 
 ptr<resp_msg> raft_server::handle_append_entries(req_msg &req) {
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     if (req.get_term() == state_->get_term()) {
         if (role_ == srv_role::candidate) {
             become_follower();
@@ -105,6 +107,9 @@ ptr<resp_msg> raft_server::handle_append_entries(req_msg &req) {
     leader_ = req.get_src();
     commit(req.get_commit_idx());
     resp->accept(req.get_last_log_idx() + req.log_entries().size() + 1);
+
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     return resp;
 }
 
@@ -113,27 +118,16 @@ ptr<resp_msg> raft_server::handle_vote_req(req_msg &req) {
 
     ptr<resp_msg> resp = cs_new<resp_msg>(state_->get_term(), msg_type::request_vote_response, id_, req.get_src());
 
-    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
-
     bool log_okay = req.get_last_log_term() > log_store_->last_entry()->get_term() ||
                     (req.get_last_log_term() == log_store_->last_entry()->get_term() &&
                      log_store_->next_slot() - 1 <= req.get_last_log_idx());
 
-    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
-
     bool grant = req.get_term() == state_->get_term() && log_okay &&
                  (state_->get_voted_for() == req.get_src() || state_->get_voted_for() == -1);
 
-    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
-
     if (grant) {
-        l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
         resp->accept(log_store_->next_slot());
-
-        l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
         state_->set_voted_for(req.get_src());
-
-        l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
         ctx_->state_mgr_->save_state(*state_);
     }
 
@@ -186,6 +180,8 @@ ptr<resp_msg> raft_server::handle_cli_req(req_msg &req) {
 }
 
 ptr<resp_msg> raft_server::handle_extended_msg(req_msg &req) {
+    l_->debug(lstrfmt("%s %s %d: %s TRACE").fmt(__FILE__, __FUNCTION__, __LINE__, msg_type_string(req.get_type())));
+
     switch (req.get_type()) {
         case msg_type::add_server_request:
             return handle_add_srv_req(req);
@@ -211,8 +207,11 @@ ptr<resp_msg> raft_server::handle_extended_msg(req_msg &req) {
 //    return ptr<resp_msg>();
 }
 
+#include <cppcodec/hex_default_lower.hpp>
 
 ptr<resp_msg> raft_server::handle_add_srv_req(req_msg &req) {
+    l_->debug(lstrfmt("%s %s %d: %s TRACE").fmt(__FILE__, __FUNCTION__, __LINE__, msg_type_string(req.get_type())));
+
     std::vector<ptr<log_entry>> &entries = req.log_entries();
     ptr<resp_msg> resp = cs_new<resp_msg>(state_->get_term(), msg_type::add_server_response, id_, leader_);
 
@@ -226,7 +225,11 @@ ptr<resp_msg> raft_server::handle_add_srv_req(req_msg &req) {
         return resp;
     }
 
+    l_->debug(lstrfmt("%s %d: %d %s").fmt(__FUNCTION__, __LINE__, entries[0]->get_buf().size(),
+                                          hex::encode(entries[0]->get_buf().data(),
+                                                      entries[0]->get_buf().size()).c_str()));
     ptr<srv_config> srv_conf = srv_config::deserialize(entries[0]->get_buf());
+    l_->debug(lstrfmt("%s %s %d: %s TRACE").fmt(__FILE__, __FUNCTION__, __LINE__, msg_type_string(req.get_type())));
 
     if (peers_.find(srv_conf->get_id()) != peers_.end() || id_ == srv_conf->get_id()) {
         l_->warn(lstrfmt("the server to be added has a duplicated id with existing server %d").fmt(srv_conf->get_id()));
@@ -240,10 +243,12 @@ ptr<resp_msg> raft_server::handle_add_srv_req(req_msg &req) {
     }
 
     conf_to_add_ = std::move(srv_conf);
+    l_->debug(lstrfmt("%s %s %d: %s TRACE").fmt(__FILE__, __FUNCTION__, __LINE__, msg_type_string(req.get_type())));
 
     using exec_type = timer_task<peer &>::executor;
     auto exec = (exec_type) std::bind(&raft_server::handle_hb_timeout, this, std::placeholders::_1);
     srv_to_join_ = cs_new<peer, ptr<srv_config> &, context &, exec_type &>(conf_to_add_, *ctx_, exec);
+    l_->debug(lstrfmt("%s %s %d: %s TRACE").fmt(__FILE__, __FUNCTION__, __LINE__, msg_type_string(req.get_type())));
 
     invite_srv_to_join_cluster();
     resp->accept(log_store_->next_slot());

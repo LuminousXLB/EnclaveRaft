@@ -587,6 +587,8 @@ ulong raft_server::term_for_log(ulong log_idx) {
 }
 
 ptr<async_result<bool>> raft_server::send_msg_to_leader(ptr<req_msg> &req) {
+    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+
     typedef std::unordered_map<int32, ptr<rpc_client>>::const_iterator rpc_client_itor;
     int32 leader_id = leader_;
     ptr<cluster_config> cluster = config_;

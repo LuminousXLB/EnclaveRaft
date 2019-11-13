@@ -49,7 +49,7 @@ ptr<resp_msg> raft_server::process_req(req_msg &req) {
         }
     }
 
-    l_->debug(lstrfmt("%s %s %d: TRACE").fmt(__FILE__, __FUNCTION__, __LINE__));
+    l_->debug(lstrfmt("%s %s %d: %s TRACE").fmt(__FILE__, __FUNCTION__, __LINE__, msg_type_string(req.get_type())));
 
     ptr<resp_msg> resp;
     if (req.get_type() == msg_type::append_entries_request) {
@@ -62,6 +62,7 @@ ptr<resp_msg> raft_server::process_req(req_msg &req) {
         // extended requests
         resp = handle_extended_msg(req);
     }
+
 
     if (resp) {
         l_->debug(lstrfmt("[%s] to %d <- RESPONSE with Accepted=%d, Term=%llu, NextIndex=%llu [CurrentLeader=%d]")
@@ -76,8 +77,14 @@ ptr<resp_msg> raft_server::process_req(req_msg &req) {
     return resp;
 }
 
+#include "cppcodec/hex_default_lower.hpp"
+
 ptr<async_result<bool>> raft_server::add_srv(const srv_config &srv) {
+    l_->debug(lstrfmt("raft_server::add_srv -> %s %d").fmt(srv.get_endpoint(), srv.get_id()));
     bufptr buf = srv.serialize();
+
+    l_->debug(lstrfmt("raft_server::add_srv -> %s").fmt(hex::encode(buf->data(), buf->size()).c_str()));
+
     ptr<log_entry> log = cs_new<log_entry>(0, std::move(buf), log_val_type::cluster_server);
     ptr<req_msg> req = cs_new<req_msg>((ulong) 0, msg_type::add_server_request, 0, 0, (ulong) 0, (ulong) 0, (ulong) 0);
     req->log_entries().push_back(log);

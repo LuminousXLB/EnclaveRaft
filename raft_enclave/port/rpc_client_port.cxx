@@ -4,6 +4,7 @@
 
 #include <tlibc/mbusafecrt.h>
 #include "rpc_client_port.hxx"
+#include "messages.hxx"
 
 using cornerstone::rpc_exception;
 using cornerstone::cs_new;
@@ -25,12 +26,17 @@ void ecall_rpc_response(uint32_t req_uid, uint32_t size, const uint8_t *msg, con
         rpc_client_callback_pool.erase(req_uid);
     }
 
-    ptr<resp_msg> rsp;
-    ptr<rpc_exception> except;
 
-    if (!exception) {
-        // FIXME: Encrypt & Decrypt
-        shared_ptr<vector<uint8_t >> message_buffer = raft_decrypt(msg, size);
+    ptr<resp_msg> rsp = nullptr;
+    ptr<rpc_exception> except = nullptr;
+
+
+    auto type = static_cast<er_message_type>(*(uint16_t *) msg);
+    if (type != raft_message) {
+        except = cs_new<rpc_exception>("Unexpected Message Type", req);
+    } else if (!exception) {
+        // FIXME: Decrypt
+        shared_ptr<vector<uint8_t >> message_buffer = raft_decrypt(msg + sizeof(uint16_t), size - sizeof(uint16_t));
 
         bufptr resp_buf = buffer::alloc(RPC_RESP_HEADER_SIZE);
         memcpy_s(resp_buf->data(), resp_buf->size(), message_buffer->data(), message_buffer->size());
