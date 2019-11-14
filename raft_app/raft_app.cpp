@@ -54,8 +54,15 @@ int main(int argc, char const *argv[]) {
     attestation_verification_report = ias.report(base64::encode(*quote));
 
     std::cout << attestation_verification_report << std::endl;
-
-//    exit(-1);
+    bool result;
+    status = ecall_register_verification_report(global_enclave_id, &result, attestation_verification_report.c_str());
+    if (status != SGX_SUCCESS) {
+        print_error_message(status);
+        exit(EXIT_FAILURE);
+    }
+    if (!result) {
+        exit(EXIT_FAILURE);
+    }
 
     /* initialise raft service */
     status = ecall_raft_instance_run(global_enclave_id, srv_id, "127.0.0.1", 9000 + srv_id);

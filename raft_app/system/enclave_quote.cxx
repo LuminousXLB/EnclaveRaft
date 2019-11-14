@@ -4,15 +4,14 @@
 
 #include "enclave_quote.hxx"
 
+#include <memory>
 #include <iostream>
 #include <thread>
-#include "raft_enclave_u.h"
+#include "cppcodec/hex_default_lower.hpp"
 #include "sgx_uae_service.h"
 #include "sgx_exception.hpp"
-#include <memory>
-#include "cppcodec/hex_default_lower.hpp"
 #include "secret.h"
-#include "common.hxx"
+#include "raft_enclave_u.h"
 
 //#define VERBOSE
 
@@ -71,7 +70,7 @@ void print_sgx_quote(const char *prefix, const sgx_quote_t *quote) {
 #undef enc
 
 ptr<bytes> get_enclave_quote() {
-    sgx_status_t status = SGX_SUCCESS;
+    sgx_status_t status;
     sgx_status_t sgx_ret = SGX_SUCCESS;
 
     /* sgx_init_quote */
@@ -129,13 +128,13 @@ ptr<bytes> get_enclave_quote() {
             0,
             nullptr,
             reinterpret_cast<sgx_quote_t *>(&(*quote_buffer)[0]),
-            quote_size
+            quote_buffer->size()
     );
     if (status != SGX_SUCCESS) {
         throw sgx_error("call sgx_get_quote", status);
     }
 #ifdef VERBOSE
-    #include "cppcodec/base64_default_rfc4648.hpp"
+#include "cppcodec/base64_default_rfc4648.hpp"
 
     puts("SGX quote: {");
     print_sgx_quote("    ", reinterpret_cast<const sgx_quote_t *>(quote_buffer.get()));

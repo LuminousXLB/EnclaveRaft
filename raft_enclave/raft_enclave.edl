@@ -25,6 +25,7 @@ enclave {
 
         /* attestation */
         public sgx_status_t ecall_get_report([in] sgx_target_info_t *target_info, [out] sgx_report_t *report);
+        public bool ecall_register_verification_report([in, string] const char * http_packet);
     };
 
     untrusted {

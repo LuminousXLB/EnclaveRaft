@@ -37,13 +37,14 @@ ptr<msg_handler> raft_rpc_request_handler;
 static mutex message_buffer_lock;
 static atomic<uint32_t> id_counter;
 static map<uint32_t, shared_ptr<vector<uint8_t>>> response_buffer_map;
+extern string attestation_verification_report;
 
 
 ptr<bytes> handle_raft_message(const uint8_t *data, uint32_t size);
 
 ptr<bytes> handle_client_message(er_message_type type, const string &payload);
 
-#include <cppcodec/hex_default_lower.hpp>
+//#include <cppcodec/hex_default_lower.hpp>
 
 int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t *msg_id) {
     p_logger->debug(lstrfmt("ecall_handle_rpc_request -> %d %s").fmt(size, hex::encode(message, size).c_str()));
@@ -108,7 +109,8 @@ ptr<bytes> handle_client_message(er_message_type type, const string &payload) {
     }
 
     auto resp_type = make_shared<uint16_t>(0);
-    ptr<async_result<bool>> a_result = nullptr;
+
+    bool result;
 
     switch (type) {
         case client_add_srv_req:
@@ -119,14 +121,16 @@ ptr<bytes> handle_client_message(er_message_type type, const string &payload) {
                 p_logger->debug(lstrfmt("%s -> %s %d").fmt(__FUNCTION__, endpoint.c_str(), server_id));
 
                 srv_config srv_cfg(server_id, endpoint);
-                a_result = raft_rpc_request_handler->add_srv(srv_cfg);
+                ptr<async_result<bool>> a_result = raft_rpc_request_handler->add_srv(srv_cfg);
+                result = a_result->get();
             }
             break;
         case client_remove_srv_req:
             *resp_type = client_remove_srv_resp;
             {
                 uint16_t server_id = body["server_id"].int_value();
-                a_result = raft_rpc_request_handler->remove_srv(server_id);
+                ptr<async_result<bool>> a_result = raft_rpc_request_handler->remove_srv(server_id);
+                result = a_result->get();
             }
             break;
         case client_append_entries_req:
@@ -138,7 +142,8 @@ ptr<bytes> handle_client_message(er_message_type type, const string &payload) {
                     bufptr p_log = buffer::alloc(log.size());
                     memcpy_s(p_log->data(), p_log->size(), log.data(), log.size());
                 }
-                a_result = raft_rpc_request_handler->append_entries(logs);
+                ptr<async_result<bool>> a_result = raft_rpc_request_handler->append_entries(logs);
+                result = a_result->get();
             }
             break;
         default:
@@ -146,7 +151,7 @@ ptr<bytes> handle_client_message(er_message_type type, const string &payload) {
     }
 
     Json resp_body = Json::object{
-            {"success", int(a_result->get())}
+            {"success", int(result)}
     };
 
     string response = resp_body.dump();

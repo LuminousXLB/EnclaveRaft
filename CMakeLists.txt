@@ -22,7 +22,7 @@ add_subdirectory(raft_app/sgx_utils)
 include_directories(raft_app/sgx_utils)
 
 include_directories(common)
-set(T_COMMON_SRCS common/aes_ctr_crypto.cxx)
+set(T_COMMON_SRCS common/aes_ctr_crypto.cxx common/url_decode.cxx)
 set(U_COMMON_SRCS "")
 set(C_COMMON_SRCS common/aes_ctr_crypto.cxx)
 

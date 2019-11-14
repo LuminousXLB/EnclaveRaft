@@ -6,7 +6,6 @@
 #define ENCLAVERAFT_ENCLAVE_QUOTE_HXX
 
 #include "common.hxx"
-#include <string>
 
 ptr<bytes> get_enclave_quote();
 
