@@ -116,7 +116,7 @@ ptr<bytes> handle_client_message(er_message_type type, const string &payload) {
         case client_add_srv_req:
             *resp_type = client_add_srv_resp;
             {
-                uint16_t server_id = body["server_id"].int_value();
+                int32_t server_id = body["server_id"].int_value();
                 string endpoint = body["endpoint"].string_value();
                 p_logger->debug(lstrfmt("%s -> %s %d").fmt(__FUNCTION__, endpoint.c_str(), server_id));
 

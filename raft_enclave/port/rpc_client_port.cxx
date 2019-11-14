@@ -11,32 +11,52 @@ using cornerstone::cs_new;
 using cornerstone::resp_msg;
 using cornerstone::msg_type;
 
-map<uint64_t, callback_item> rpc_client_callback_pool;
+map<uint64_t, raft_callback_item> raft_rpc_client_callback_pool;
+map<uint64_t, system_callback_item> system_rpc_client_callback_pool;
+
 mutex rpc_client_callback_pool_lock;
 atomic<uint32_t> last_req_uid_;
 
+static void handle_raft_message(uint32_t req_uid, const uint8_t *data, uint32_t size, const char *exception);
+
+static void handle_keyxchg_message(uint32_t req_uid, const uint8_t *data, uint32_t size, const char *exception);
+
 void ecall_rpc_response(uint32_t req_uid, uint32_t size, const uint8_t *msg, const char *exception) {
+
+    auto type = static_cast<er_message_type>(*(uint16_t *) msg);
+
+    switch (type) {
+        case system_key_exchange_resp:
+            handle_keyxchg_message(req_uid, msg + sizeof(uint16_t), size - sizeof(uint16_t), exception);
+            break;
+        case system_key_setup_resp:
+            break;
+        case raft_message:
+            handle_raft_message(req_uid, msg + sizeof(uint16_t), size - sizeof(uint16_t), exception);
+            break;
+        default:
+            return;
+    }
+
+}
+
+static void handle_raft_message(uint32_t req_uid, const uint8_t *data, uint32_t size, const char *exception) {
     ptr<req_msg> req;
     rpc_handler when_done;
     {
         lock_guard<mutex> lock(rpc_client_callback_pool_lock);
-        auto item = rpc_client_callback_pool[req_uid];
+        auto item = raft_rpc_client_callback_pool[req_uid];
         req = item.first;
         when_done = item.second;
-        rpc_client_callback_pool.erase(req_uid);
+        raft_rpc_client_callback_pool.erase(req_uid);
     }
-
 
     ptr<resp_msg> rsp = nullptr;
     ptr<rpc_exception> except = nullptr;
 
-
-    auto type = static_cast<er_message_type>(*(uint16_t *) msg);
-    if (type != raft_message) {
-        except = cs_new<rpc_exception>("Unexpected Message Type", req);
-    } else if (!exception) {
+    if (!exception) {
         // FIXME: Decrypt
-        shared_ptr<vector<uint8_t >> message_buffer = raft_decrypt(msg + sizeof(uint16_t), size - sizeof(uint16_t));
+        shared_ptr<vector<uint8_t >> message_buffer = raft_decrypt(data, size);
 
         bufptr resp_buf = buffer::alloc(RPC_RESP_HEADER_SIZE);
         memcpy_s(resp_buf->data(), resp_buf->size(), message_buffer->data(), message_buffer->size());
@@ -47,4 +67,21 @@ void ecall_rpc_response(uint32_t req_uid, uint32_t size, const uint8_t *msg, con
     }
 
     when_done(rsp, except);
+}
+
+static void handle_keyxchg_message(uint32_t req_uid, const uint8_t *data, uint32_t size, const char *exception) {
+    ptr<string> req;
+    system_callback when_done;
+    {
+        lock_guard<mutex> lock(rpc_client_callback_pool_lock);
+        auto item = system_rpc_client_callback_pool[req_uid];
+        req = item.first;
+        when_done = item.second;
+        system_rpc_client_callback_pool.erase(req_uid);
+    }
+
+    string json_err;
+    Json rsp = Json::parse(string(data, data + size), json_err);
+
+    when_done(make_shared<Json>(rsp), json_err + " || " + exception);
 }

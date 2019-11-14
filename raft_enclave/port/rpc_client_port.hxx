@@ -16,6 +16,9 @@
 #include "msg_serializer.hxx"
 #include "crypto.hxx"
 #include "messages.hxx"
+#include "json11.hpp"
+
+using json11::Json;
 
 using std::map;
 using std::pair;
@@ -33,8 +36,13 @@ using cornerstone::rpc_handler;
 using cornerstone::lstrfmt;
 
 
-using callback_item = pair<ptr<req_msg>, rpc_handler>;
-extern map<uint64_t, callback_item> rpc_client_callback_pool;
+using raft_callback_item = pair<ptr<req_msg>, rpc_handler>;
+
+using system_callback = std::function<void(ptr<Json>, string)>;
+using system_callback_item = pair<ptr<string>, system_callback>;
+
+extern map<uint64_t, raft_callback_item> raft_rpc_client_callback_pool;
+extern map<uint64_t, system_callback_item> system_rpc_client_callback_pool;
 extern mutex rpc_client_callback_pool_lock;
 extern atomic<uint32_t> last_req_uid_;
 
@@ -55,9 +63,9 @@ public:
     ~RpcClientPort() override {
         {
             lock_guard<mutex> lock(rpc_client_callback_pool_lock);
-            auto it = rpc_client_callback_pool.find(client_uid_);
-            if (it != rpc_client_callback_pool.end()) {
-                rpc_client_callback_pool.erase(it);
+            auto it = raft_rpc_client_callback_pool.find(client_uid_);
+            if (it != raft_rpc_client_callback_pool.end()) {
+                raft_rpc_client_callback_pool.erase(it);
             }
         }
 
@@ -71,18 +79,38 @@ public:
 
         // FIXME: Encrypt
         auto message_buffer = raft_encrypt(req_buffer->data(), req_buffer->size());
-        uint16_t type = raft_message;
-        auto *ptr = reinterpret_cast<uint8_t *>(&type);
-        message_buffer->insert(message_buffer->begin(), ptr, ptr + sizeof(uint16_t));
 
-        uint32_t uid = 0;
+        uint32_t uid = ++last_req_uid_;;
         {
             lock_guard<mutex> lock(rpc_client_callback_pool_lock);
-            uid = ++last_req_uid_;
-            rpc_client_callback_pool[uid] = make_pair(req, when_done);
+            raft_rpc_client_callback_pool[uid] = make_pair(req, when_done);
         }
 
-        ocall_send_rpc_request(client_uid_, message_buffer->size(), message_buffer->data(), uid);
+        raw_send(raft_message, message_buffer, uid);
+    }
+
+    void send_xchg_request(int32_t my_id, const string &my_report, system_callback callback) {
+        Json body = Json::object{
+                {"server_id", my_id},
+                {"report",    my_report}
+        };
+
+        string body_str = body.dump();
+        ptr<bytes> buffer = make_shared<bytes>(body_str.begin(), body_str.end());
+
+        uint32_t uid = ++last_req_uid_;;
+        {
+            lock_guard<mutex> lock(rpc_client_callback_pool_lock);
+            system_rpc_client_callback_pool[uid] = make_pair(make_shared<string>(body_str), callback);
+        }
+
+        raw_send(system_key_exchange_req, buffer, uid);
+    }
+
+    void raw_send(er_message_type type, const ptr<bytes> &message, uint32_t unique_id) {
+        auto *ptr = reinterpret_cast<uint8_t *>(&type);
+        message->insert(message->begin(), ptr, ptr + sizeof(uint16_t));
+        ocall_send_rpc_request(client_uid_, message->size(), message->data(), unique_id);
     }
 
 private:

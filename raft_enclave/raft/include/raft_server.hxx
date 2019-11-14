@@ -159,6 +159,8 @@ namespace cornerstone {
 
         void commit_in_bg();
 
+        int32_t server_id() const { return id_; };
+
     private:
         typedef std::unordered_map<int32, ptr<peer>>::
         const_iterator peer_itor;
