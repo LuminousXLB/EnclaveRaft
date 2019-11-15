@@ -79,9 +79,9 @@ ptr<resp_msg> raft_server::process_req(req_msg &req) {
 
 #include "cppcodec/hex_default_lower.hpp"
 
-ptr<async_result<bool>> raft_server::add_srv(const srv_config &srv) {
-    l_->debug(lstrfmt("raft_server::add_srv -> %s %d").fmt(srv.get_endpoint(), srv.get_id()));
-    bufptr buf = srv.serialize();
+ptr<async_result<bool>> raft_server::add_srv(const ptr<srv_config> &srv) {
+    l_->debug(lstrfmt("raft_server::add_srv -> %s %d").fmt(srv->get_endpoint().c_str(), srv->get_id()));
+    bufptr buf = srv->serialize();
 
     l_->debug(lstrfmt("raft_server::add_srv -> %s").fmt(hex::encode(buf->data(), buf->size()).c_str()));
 

@@ -164,15 +164,15 @@ private:
                 this->stop();
             }
         } catch (std::exception &ex) {
-            global_logger->error("socket session {}: failed to process request message due to error {}", session_id_,
-                                 ex.what());
+            global_logger->error("socket session {}: failed to process request message due to error {}",
+                                 session_id_, ex.what());
             this->stop();
         }
     }
 
     void write_response(const ptr<bytes> &resp_buf) {
-        global_logger->trace("socket session {}: {} payload_size={}, payload=", session_id_, __FUNCTION__,
-                             payload_size_, spdlog::to_hex(*resp_buf));
+        global_logger->trace("socket session {}: {} payload_size={}, payload={}", session_id_, __FUNCTION__,
+                             resp_buf->size(), spdlog::to_hex(*resp_buf));
 
         payload_size_ = resp_buf->size();
 

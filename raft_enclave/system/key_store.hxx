@@ -16,7 +16,9 @@
 
 using std::map;
 using json11::Json;
-using attestation_callback = std::function<void(bool)>;
+using cornerstone::srv_config;
+
+extern ptr<msg_handler> raft_rpc_request_handler;
 
 class er_key_store : public std::enable_shared_from_this<er_key_store> {
 
@@ -30,44 +32,73 @@ public:
         return self_public_;
     }
 
-    void add_server(int32_t server_id, const string &endpoint, attestation_callback &callback) {
-        if (store_.find(server_id) != store_.end()) {
-            /* attested or attesting */
-            callback(true);
-            return;
-        }
-
-        auto it = temp_connections_.find(server_id);
-        if (it != temp_connections_.end()) {
-            lock_guard<mutex> lock(temp_connections_lock_);
-            ptr<RpcClientPort> client = it->second.first;
-            temp_connections_[server_id] = std::make_pair(client, callback);
-            return;
-        }
-
-        ptr<RpcClientPort> client = make_shared<RpcClientPort>(endpoint);
-        int32_t id = raft_rpc_request_handler->server_id();
-
-        auto self = shared_from_this();
-        client->send_xchg_request(id, self_report_,
-                                  [self, server_id, endpoint](const ptr<Json> &resp, const string &exception) {
-                                      int32_t peer_id = (*resp)["server_id"].int_value();
-                                      string report = (*resp)["report"].string_value();
-
-                                      self->handle_xchg_resp(server_id, endpoint, report.c_str());
-                                  });
-
+    const string &report() const {
+        return self_report_;
     }
 
+    void build_key_xchg_req(int32_t server_id, const string &endpoint) {
+        p_logger->debug("TRACE er_key_store::" + string(__FUNCTION__) + " " + endpoint);
 
-    void handle_xchg_resp(int32_t server_id, string endpoint, const char *http_packet) {
-        attestation_callback callback;
+        if (store_.find(server_id) != store_.end()) {
+            /* attested or attesting */
+            raft_rpc_request_handler->add_srv(make_shared<srv_config>(server_id, endpoint));
+            return;
+        }
+
+        ptr<RpcClientPort> client = nullptr;
+        int32_t id = raft_rpc_request_handler->server_id();
         {
             lock_guard<mutex> lock(temp_connections_lock_);
             auto it = temp_connections_.find(server_id);
-            callback = it->second.second;
+            if (it == temp_connections_.end()) {
+                client = make_shared<RpcClientPort>(endpoint);
+                temp_connections_[server_id] = std::make_pair(client, endpoint);
+            } else {
+                client = it->second.first;
+                temp_connections_[server_id] = std::make_pair(client, endpoint);
+                return;
+            }
+        }
+
+        auto self = shared_from_this();
+        client->send_xchg_request(id, self_report_);
+    }
+
+    void handle_key_xchg_resp(const string &payload, const string &exception) {
+        if (!exception.empty()) {
+            p_logger->err("er_key_store::handle_key_xchg_resp: RPC Exception: " + exception);
+            return;
+        }
+
+        string json_err;
+        Json rsp = Json::parse(payload, json_err);
+
+        if (!json_err.empty()) {
+            p_logger->err("er_key_store::handle_key_xchg_resp: JSON Pare Error: " + json_err);
+            return;
+        }
+
+        int32_t server_id = rsp["server_id"].int_value();
+        string report = rsp["report"].string_value();
+
+        bool result = receive_report(server_id, report.c_str());
+
+        string endpoint;
+        {
+            lock_guard<mutex> lock(temp_connections_lock_);
+            auto it = temp_connections_.find(server_id);
+            endpoint = it->second.second;
             temp_connections_.erase(server_id);
         }
+
+        p_logger->debug("TRACE er_key_store::" + string(__FUNCTION__) + " " + std::to_string(__LINE__));
+        p_logger->debug("TRACE er_key_store::" + string(__FUNCTION__) + " " + endpoint);
+
+        raft_rpc_request_handler->add_srv(make_shared<srv_config>(server_id, endpoint));
+    }
+
+    bool receive_report(int32_t server_id, const char *http_packet) {
+        p_logger->debug("TRACE er_key_store::" + string(__FUNCTION__) + " " + std::to_string(__LINE__));
 
         auto quote_bytes = validate_verification_report(http_packet);
         if (quote_bytes != nullptr) {
@@ -80,12 +111,12 @@ public:
 
             {
                 lock_guard<mutex> lock(store_lock_);
-                store_[server_id] = make_shared<server_info>(pk, endpoint);
+                store_[server_id] = make_shared<server_info>(pk);
             }
 
-            callback(true);
+            return true;
         } else {
-            callback(false);
+            return false;
         }
     }
 
@@ -98,15 +129,14 @@ private:
 
     struct server_info {
         sgx_ec256_public_t public_key;
-        string endpoint;
 
-        server_info(sgx_ec256_public_t pk, string ep) : public_key(pk), endpoint(std::move(ep)) {}
+        explicit server_info(sgx_ec256_public_t pk) : public_key(pk) {}
     };
 
     map<int32_t, ptr<server_info>> store_;
     mutex store_lock_;
 
-    map<int32_t, std::pair<ptr<RpcClientPort>, attestation_callback>> temp_connections_;
+    map<int32_t, std::pair<ptr<RpcClientPort>, string>> temp_connections_;
     mutex temp_connections_lock_;
 };
 

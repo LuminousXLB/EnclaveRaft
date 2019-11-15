@@ -38,11 +38,11 @@ using cornerstone::lstrfmt;
 
 using raft_callback_item = pair<ptr<req_msg>, rpc_handler>;
 
-using system_callback = std::function<void(ptr<Json>, string)>;
-using system_callback_item = pair<ptr<string>, system_callback>;
+//using system_callback = std::function<void(const string &, string)>;
+//using system_callback_item = pair<ptr<string>, system_callback>;
+//extern map<uint64_t, system_callback_item> system_rpc_client_callback_pool;
 
 extern map<uint64_t, raft_callback_item> raft_rpc_client_callback_pool;
-extern map<uint64_t, system_callback_item> system_rpc_client_callback_pool;
 extern mutex rpc_client_callback_pool_lock;
 extern atomic<uint32_t> last_req_uid_;
 
@@ -89,7 +89,7 @@ public:
         raw_send(raft_message, message_buffer, uid);
     }
 
-    void send_xchg_request(int32_t my_id, const string &my_report, system_callback callback) {
+    void send_xchg_request(int32_t my_id, const string &my_report) {
         Json body = Json::object{
                 {"server_id", my_id},
                 {"report",    my_report}
@@ -98,11 +98,7 @@ public:
         string body_str = body.dump();
         ptr<bytes> buffer = make_shared<bytes>(body_str.begin(), body_str.end());
 
-        uint32_t uid = ++last_req_uid_;;
-        {
-            lock_guard<mutex> lock(rpc_client_callback_pool_lock);
-            system_rpc_client_callback_pool[uid] = make_pair(make_shared<string>(body_str), callback);
-        }
+        uint32_t uid = ++last_req_uid_;
 
         raw_send(system_key_exchange_req, buffer, uid);
     }

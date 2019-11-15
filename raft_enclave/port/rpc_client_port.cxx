@@ -5,6 +5,7 @@
 #include <tlibc/mbusafecrt.h>
 #include "rpc_client_port.hxx"
 #include "messages.hxx"
+#include "../system/key_store.hxx"
 
 using cornerstone::rpc_exception;
 using cornerstone::cs_new;
@@ -12,24 +13,24 @@ using cornerstone::resp_msg;
 using cornerstone::msg_type;
 
 map<uint64_t, raft_callback_item> raft_rpc_client_callback_pool;
-map<uint64_t, system_callback_item> system_rpc_client_callback_pool;
+//map<uint64_t, system_callback_item> system_rpc_client_callback_pool;
 
 mutex rpc_client_callback_pool_lock;
 atomic<uint32_t> last_req_uid_;
+extern ptr<er_key_store> key_store;
+
+static void handle_system_resp(er_message_type type, uint32_t req_uid,
+                               const uint8_t *data, uint32_t size, const char *exception);
 
 static void handle_raft_message(uint32_t req_uid, const uint8_t *data, uint32_t size, const char *exception);
 
-static void handle_keyxchg_message(uint32_t req_uid, const uint8_t *data, uint32_t size, const char *exception);
-
 void ecall_rpc_response(uint32_t req_uid, uint32_t size, const uint8_t *msg, const char *exception) {
-
     auto type = static_cast<er_message_type>(*(uint16_t *) msg);
 
     switch (type) {
         case system_key_exchange_resp:
-            handle_keyxchg_message(req_uid, msg + sizeof(uint16_t), size - sizeof(uint16_t), exception);
-            break;
         case system_key_setup_resp:
+            handle_system_resp(type, req_uid, msg + sizeof(uint16_t), size - sizeof(uint16_t), exception);
             break;
         case raft_message:
             handle_raft_message(req_uid, msg + sizeof(uint16_t), size - sizeof(uint16_t), exception);
@@ -39,6 +40,28 @@ void ecall_rpc_response(uint32_t req_uid, uint32_t size, const uint8_t *msg, con
     }
 
 }
+
+static void handle_system_resp(er_message_type type, uint32_t req_uid,
+                               const uint8_t *data, uint32_t size, const char *exception) {
+    string payload = string(data, data + size);
+    p_logger->debug("handle_system_resp: payload = " + payload);
+
+    switch (type) {
+        case system_key_exchange_resp:
+            if (exception == nullptr) {
+                key_store->handle_key_xchg_resp(payload, "");
+            } else {
+                p_logger->warn("handle_system_resp: exception = " + string(exception));
+                key_store->handle_key_xchg_resp(payload, exception);
+            }
+            return;
+        case system_key_setup_resp:
+            return;
+        default:
+            return;
+    }
+}
+
 
 static void handle_raft_message(uint32_t req_uid, const uint8_t *data, uint32_t size, const char *exception) {
     ptr<req_msg> req;
@@ -67,21 +90,4 @@ static void handle_raft_message(uint32_t req_uid, const uint8_t *data, uint32_t 
     }
 
     when_done(rsp, except);
-}
-
-static void handle_keyxchg_message(uint32_t req_uid, const uint8_t *data, uint32_t size, const char *exception) {
-    ptr<string> req;
-    system_callback when_done;
-    {
-        lock_guard<mutex> lock(rpc_client_callback_pool_lock);
-        auto item = system_rpc_client_callback_pool[req_uid];
-        req = item.first;
-        when_done = item.second;
-        system_rpc_client_callback_pool.erase(req_uid);
-    }
-
-    string json_err;
-    Json rsp = Json::parse(string(data, data + size), json_err);
-
-    when_done(make_shared<Json>(rsp), json_err + " || " + exception);
 }

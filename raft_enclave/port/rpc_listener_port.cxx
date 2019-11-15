@@ -6,11 +6,13 @@
 #include <map>
 #include <mutex>
 #include <tlibc/mbusafecrt.h>
+#include <cppcodec/base64_default_rfc4648.hpp>
+#include "json11.hpp"
 #include "rpc_listener_port.hxx"
 #include "crypto.hxx"
 #include "messages.hxx"
-#include "json11.hpp"
-#include <cppcodec/base64_default_rfc4648.hpp>
+#include "../system/key_store.hxx"
+//#include <cppcodec/hex_default_lower.hpp>
 
 using std::map;
 using std::mutex;
@@ -31,20 +33,19 @@ using cornerstone::log_val_type;
 using cornerstone::resp_msg;
 using cornerstone::lstrfmt;
 
-
 ptr<msg_handler> raft_rpc_request_handler;
 
 static mutex message_buffer_lock;
 static atomic<uint32_t> id_counter;
 static map<uint32_t, shared_ptr<vector<uint8_t>>> response_buffer_map;
 extern string attestation_verification_report;
+extern ptr<er_key_store> key_store;
 
+ptr<bytes> handle_client_request(er_message_type type, const string &payload);
+
+ptr<bytes> handle_system_request(er_message_type type, const string &payload);
 
 ptr<bytes> handle_raft_message(const uint8_t *data, uint32_t size);
-
-ptr<bytes> handle_client_message(er_message_type type, const string &payload);
-
-//#include <cppcodec/hex_default_lower.hpp>
 
 int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t *msg_id) {
     p_logger->debug(lstrfmt("ecall_handle_rpc_request -> %d %s").fmt(size, hex::encode(message, size).c_str()));
@@ -57,22 +58,23 @@ int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t
         case client_add_srv_req:
         case client_remove_srv_req:
         case client_append_entries_req:;
-            response = handle_client_message(type, string(message + sizeof(uint16_t), message + size));
+            response = handle_client_request(type, string(message + sizeof(uint16_t), message + size));
             break;
         case system_key_exchange_req:
-            break;
         case system_key_setup_req:
+            response = handle_system_request(type, string(message + sizeof(uint16_t), message + size));
             break;
         case raft_message:
             response = handle_raft_message(message + sizeof(uint16_t), size - sizeof(uint16_t));
-            response->insert(response->begin(), message, message + sizeof(uint16_t));
             break;
         default:
             p_logger->err(lstrfmt("Unexpected message type [%d]").fmt(type));
             return -1;
     }
 
+
     if (response) {
+        p_logger->debug("ecall_handle_rpc_request: RESPONSE " + hex::encode(*response));
         {
             lock_guard<mutex> lock(message_buffer_lock);
             *msg_id = ++id_counter;
@@ -80,6 +82,8 @@ int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t
         }
         return response->size();
     } else {
+        p_logger->warn("ecall_handle_rpc_request: RESPONSE <NONE>");
+
         *msg_id = 0;
         return -1;
     }
@@ -91,6 +95,7 @@ bool ecall_fetch_rpc_response(uint32_t msg_id, uint32_t buffer_size, uint8_t *bu
     if (it == response_buffer_map.end()) {
         return false;
     } else {
+        p_logger->debug("ecall_fetch_rpc_response: RESPONSE " + hex::encode(*it->second));
         memcpy_s(buffer, buffer_size, it->second->data(), it->second->size());
         return true;
     }
@@ -99,7 +104,7 @@ bool ecall_fetch_rpc_response(uint32_t msg_id, uint32_t buffer_size, uint8_t *bu
 ///////////////////////////////////////////////////////////////////////////////
 
 
-ptr<bytes> handle_client_message(er_message_type type, const string &payload) {
+ptr<bytes> handle_client_request(er_message_type type, const string &payload) {
     string json_err;
     Json body = Json::parse(payload, json_err);
 
@@ -118,11 +123,13 @@ ptr<bytes> handle_client_message(er_message_type type, const string &payload) {
             {
                 int32_t server_id = body["server_id"].int_value();
                 string endpoint = body["endpoint"].string_value();
+                auto srv_cfg = make_shared<srv_config>(server_id, endpoint);
+
                 p_logger->debug(lstrfmt("%s -> %s %d").fmt(__FUNCTION__, endpoint.c_str(), server_id));
 
-                srv_config srv_cfg(server_id, endpoint);
-                ptr<async_result<bool>> a_result = raft_rpc_request_handler->add_srv(srv_cfg);
-                result = a_result->get();
+                key_store->build_key_xchg_req(server_id, endpoint);
+
+                result = true;
             }
             break;
         case client_remove_srv_req:
@@ -160,9 +167,54 @@ ptr<bytes> handle_client_message(er_message_type type, const string &payload) {
     auto resp_buf = make_shared<bytes>();
     resp_buf->reserve(sizeof(uint16_t) + response.length());
     resp_buf->insert(resp_buf->end(), type_ptr, type_ptr + sizeof(uint16_t));
-    resp_buf->insert(resp_buf->end(), response.data(), response.data() + response.size());
+    resp_buf->insert(resp_buf->end(), response.begin(), response.end());
 
     return resp_buf;
+}
+
+ptr<bytes> handle_system_request(er_message_type type, const string &payload) {
+    string json_err;
+    Json body = Json::parse(payload, json_err);
+
+    if (!json_err.empty()) {
+        p_logger->err(lstrfmt("JSON Parse Error: %s").fmt(payload.c_str()));
+        p_logger->err(lstrfmt("JSON Parse Error: %s").fmt(json_err.c_str()));
+    }
+
+    ptr<bytes> buffer = nullptr;
+    uint16_t resp_type;
+
+    switch (type) {
+        case system_key_exchange_req: {
+            int32_t peer_id = body["server_id"].int_value();
+            string report = body["report"].string_value();
+
+            bool result = key_store->receive_report(peer_id, report.c_str());
+
+            if (result) {
+                Json resp = Json::object{
+                        {"server_id", raft_rpc_request_handler->server_id()},
+                        {"report",    key_store->report()}
+                };
+
+                string resp_str = resp.dump();
+                p_logger->info("response: " + resp_str);
+                buffer = make_shared<bytes>(resp_str.begin(), resp_str.end());
+            }
+        }
+            resp_type = system_key_exchange_resp;
+            break;
+        case system_key_setup_req:
+            resp_type = system_key_setup_resp;
+            return nullptr;
+        default:
+            return nullptr;
+    }
+
+    auto *ptr = reinterpret_cast<uint8_t *>(&resp_type);
+    buffer->insert(buffer->begin(), ptr, ptr + sizeof(uint16_t));
+
+    return buffer;
 }
 
 ptr<bytes> handle_raft_message(const uint8_t *data, uint32_t size) {
@@ -194,6 +246,11 @@ ptr<bytes> handle_raft_message(const uint8_t *data, uint32_t size) {
         p_logger->err(lstrfmt("failed to process request message due to error: %s").fmt(ex.what()));
         return nullptr;
     }
+
+    static uint16_t type = raft_message;
+    static auto *ptr = reinterpret_cast<uint8_t *>(&type);
+
+    message_buffer->insert(message_buffer->begin(), ptr, ptr + sizeof(uint16_t));
 
     return message_buffer;
 }

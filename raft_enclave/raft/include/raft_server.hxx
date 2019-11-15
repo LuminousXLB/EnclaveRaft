@@ -151,7 +151,7 @@ namespace cornerstone {
 
         ptr<resp_msg> process_req(req_msg &req);
 
-        ptr<async_result<bool>> add_srv(const srv_config &srv);
+        ptr<async_result<bool>> add_srv(const ptr<srv_config> &srv);
 
         ptr<async_result<bool>> remove_srv(const int srv_id);
 

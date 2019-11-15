@@ -30,7 +30,7 @@ ptr<bytes> message_handler(const bytes &message) {
     int32_t resp_len;
     ecall_handle_rpc_request(global_enclave_id, &resp_len, message.size(), message.data(), &uid);
 
-    if (resp_len == 0) {
+    if (resp_len < 1) {
         return nullptr;
     }
 
