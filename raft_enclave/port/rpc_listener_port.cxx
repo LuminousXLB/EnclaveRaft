@@ -146,8 +146,16 @@ ptr<bytes> handle_client_request(er_message_type type, const string &payload) {
                 std::vector<bufptr> logs;
                 for (const auto &item: body.array_items()) {
                     bytes log = base64::decode(item.string_value());
-                    bufptr p_log = buffer::alloc(log.size());
-                    memcpy_s(p_log->data(), p_log->size(), log.data(), log.size());
+                    string s_log(log.begin(), log.end());
+                    bufptr p_log = buffer::alloc(s_log.size() + 8);
+                    memset_s(p_log->data(), p_log->size(), 0, p_log->size());
+                    memcpy_s(p_log->data(), p_log->size(), s_log.data(), s_log.length());
+
+//                    p_logger->warn("handle_client_request " + hex::encode(log));
+//                    p_logger->warn("handle_client_request " + s_log);
+//                    p_logger->warn("handle_client_request " + hex::encode(p_log->data(), p_log->size()));
+
+                    logs.push_back(p_log);
                 }
                 ptr<async_result<bool>> a_result = raft_rpc_request_handler->append_entries(logs);
                 result = a_result->get();

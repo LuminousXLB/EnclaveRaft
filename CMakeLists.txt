@@ -78,3 +78,5 @@ target_link_libraries(client PRIVATE spdlog::spdlog)
 target_link_libraries(client PRIVATE json11)
 target_include_directories(client PRIVATE third_party/spdlog-1.4.2/include)
 target_include_directories(client PRIVATE third_party/asio-1.12.2/include)
+
+add_dependencies(client App_raft)

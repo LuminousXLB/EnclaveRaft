@@ -33,12 +33,9 @@ public:
     in_memory_state_mgr(int srv_id, const string &endpoint)
             : my_id_(srv_id), my_endpoint_(endpoint), cur_log_store_(cs_new<in_memory_log_store>()) {
         // Initial cluster config: contains only one server (myself).
+        my_srv_config_ = cs_new<srv_config>(srv_id, endpoint);
         saved_config_ = cs_new<cluster_config>();
-        saved_config_->get_servers().push_back(cs_new<srv_config>(srv_id, endpoint));
-
-//        saved_config_->get_servers().push_back(cs_new<srv_config>(1, "tcp://127.0.0.1:9001"));
-//        saved_config_->get_servers().push_back(cs_new<srv_config>(2, "tcp://127.0.0.1:9002"));
-//        saved_config_->get_servers().push_back(cs_new<srv_config>(3, "tcp://127.0.0.1:9003"));
+        saved_config_->get_servers().push_back(my_srv_config_);
     }
 
     ~in_memory_state_mgr() override = default;
@@ -46,14 +43,12 @@ public:
     ptr<cluster_config> load_config() override {
         // Just return in-memory data in this example.
         // May require reading from disk here, if it has been written to disk.
-        // TODO: READ FROM DISK
         return saved_config_;
     }
 
     void save_config(const cluster_config &config) override {
         // Just keep in memory in this example.
         // Need to write to disk here, if want to make it durable.
-        // TODO: WRITE TO DISK
         ptr<buffer> buf = config.serialize();
         saved_config_ = cluster_config::deserialize(*buf);
     }
@@ -61,7 +56,6 @@ public:
     void save_state(const srv_state &state) override {
         // Just keep in memory in this example.
         // Need to write to disk here, if want to make it durable.
-        // TODO: WRITE TO DISK
         ptr<buffer> buf = state.serialize();
         saved_state_ = srv_state::deserialize(*buf);
     }
@@ -85,7 +79,9 @@ public:
         // TODO: See if there's something to do
     }
 
-    ptr<srv_config> get_srv_config() const { return my_srv_config_; }
+    ptr<srv_config> get_srv_config() const {
+        return my_srv_config_;
+    }
 
 private:
     int my_id_;

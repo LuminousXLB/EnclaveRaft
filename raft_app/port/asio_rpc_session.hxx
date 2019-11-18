@@ -69,7 +69,7 @@ public:
             socket_.close();
         }
 
-        global_logger->trace("socket session {} stopped", session_id_);
+        global_logger->info("socket session {} stopped", session_id_);
 
         if (callback_) {
             callback_(session_id_);
@@ -86,7 +86,7 @@ private:
     }
 
     string remote_address() {
-        return socket_local_address(socket_);
+        return socket_remote_address(socket_);
     }
 
     void handle_error(const string &description, const asio::error_code &error) {

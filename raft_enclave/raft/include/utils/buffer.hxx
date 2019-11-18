@@ -26,7 +26,8 @@ namespace cornerstone {
 
     class buffer;
 
-    using bufptr = uptr<buffer, void (*)(buffer *)>;
+    using bufptr = cornerstone::ptr<buffer>;
+//    using bufptr = uptr<buffer, void (*)(buffer *)>;
 
     class buffer {
 

@@ -36,11 +36,11 @@ raft_app_context run_raft_instance(int srv_id, const string &endpoint, uint16_t 
     ptr<state_machine> p_machine = make_shared<echo_state_machine>();
 
     auto *p_params = new raft_params;
-    p_params->with_election_timeout_lower(500)
-            .with_election_timeout_upper(1000)
-            .with_hb_interval(50)
-            .with_max_append_size(100)
-            .with_rpc_failure_backoff(50);
+    (*p_params).with_election_timeout_lower(200);
+    (*p_params).with_election_timeout_upper(400);
+    (*p_params).with_hb_interval(100);
+    (*p_params).with_max_append_size(100);
+    (*p_params).with_rpc_failure_backoff(50);
 
     auto p_service = make_shared<ServicePort>();
     ptr<delayed_task_scheduler> p_scheduler = p_service;

@@ -34,7 +34,6 @@ using cornerstone::bufptr;
 using cornerstone::cs_new;
 using cornerstone::log_entry;
 using cornerstone::log_store;
-using cornerstone::ptr;
 
 class in_memory_log_store : public log_store {
 public:
