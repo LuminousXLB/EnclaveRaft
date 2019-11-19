@@ -5,172 +5,12 @@
 #include "client.hxx"
 #include <random>
 #include "messages.hxx"
-#include "json11.hpp"
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include "RequestBuilder.hxx"
+#include "SocketClient.hxx"
 
 std::shared_ptr<spdlog::logger> logger;
 
-using namespace json11;
-
-string add_server(uint16_t server_id) {
-    Json body = Json::object{
-            {"server_id", server_id},
-            {"endpoint",  fmt::format("tcp://127.0.0.1:{}", 9000 + server_id)}
-    };
-
-    return body.dump();
-}
-
-string remove_server(uint16_t server_id) {
-    Json body = Json::object{
-            {"server_id", server_id}
-    };
-
-    return body.dump();
-}
-
-string append_entries(const vector<bytes> &logs) {
-    vector<string> body;
-
-    for (const auto &log: logs) {
-        body.emplace_back(base64::encode(log));
-    }
-
-    return Json(body).dump();
-}
-
-ptr<bytes> serialize(er_message_type type, const string &payload) {
-    uint16_t type_num = type;
-    auto *ptr = reinterpret_cast<uint8_t *>(&type_num);
-
-    auto buffer = make_shared<bytes>();
-    buffer->insert(buffer->end(), ptr, ptr + sizeof(uint16_t));
-    buffer->insert(buffer->end(), payload.begin(), payload.end());
-
-    return buffer;
-}
-
-bool deserialize(const bytes &buffer) {
-    const uint16_t &type_num = *(const uint16_t *) buffer.data();
-    const char *payload = reinterpret_cast<const char *>(buffer.data() + sizeof(uint16_t));
-
-    string j(payload, payload + buffer.size() - sizeof(uint16_t));
-
-    string json_err;
-    Json body = Json::parse(j, json_err);
-
-    if (json_err.empty()) {
-        return body["success"].int_value();
-    } else {
-        throw std::runtime_error(json_err);
-    }
-}
-
-class SocketClient : public std::enable_shared_from_this<SocketClient> {
-public :
-    SocketClient(asio::io_context &io_context, uint16_t port)
-            : s_(io_context), resolver_(io_context), port_(port), size_(0) {}
-
-    void send(const bytes &request) {
-        try {
-            asio::connect(s_, resolver_.resolve("127.0.0.1", std::to_string(port_)));
-
-
-            auto local = s_.local_endpoint();
-            auto remote = s_.remote_endpoint();
-            logger->debug("Socket Local {}:{} -> Remote {}:{}",
-                          local.address().to_string(), local.port(), remote.address().to_string(), remote.port());
-
-            /* Sending message */
-            asio::error_code err;
-            uint32_t size = request.size();
-
-            asio::streambuf req_sbuf;
-            std::ostream out(&req_sbuf);
-            out.write(reinterpret_cast<const char *>(&size), sizeof(uint32_t));
-            out.write(reinterpret_cast<const char *>(request.data()), request.size());
-
-            logger->debug("Write: {}", spdlog::to_hex(request));
-
-            auto self = shared_from_this();
-
-            logger->trace("{} {} {}", __FILE__, __FUNCTION__, __LINE__);
-
-            asio::async_write(s_, req_sbuf, [self](const asio::error_code &err, size_t bytes) {
-
-                logger->trace("{} {} {}", __FILE__, "async_write callback", __LINE__);
-                if (err) {
-                    logger->error("Error when writing message: {}", err.message());
-                } else {
-                    logger->debug("Message sent, reading response");
-                }
-
-                self->receive_header();
-            });
-        } catch (std::system_error &err) {
-            logger->critical("SYSTEM ERROR HERE {}{}", __LINE__, err.what());
-            throw;
-        }
-    }
-
-    void receive_header() {
-        try {
-            logger->trace("{} {} {}", __FILE__, __FUNCTION__, __LINE__);
-            /* Reading message */
-            asio::error_code err;
-
-            auto self = shared_from_this();
-            asio::async_read(s_, resp_sbuf, asio::transfer_at_least(sizeof(uint32_t)),
-                             [self](const asio::error_code &err, size_t bytes) {
-
-                                 logger->trace("{} {} {}", __FILE__, "receive_header callback", __LINE__);
-
-                                 std::istream in(&self->resp_sbuf);
-
-                                 if (err && err != asio::error::eof) {
-                                     logger->error("Error when reading header: {}", err.message());
-                                 }
-                                 in.read(reinterpret_cast<char *>(&self->size_), sizeof(uint32_t));
-
-                                 self->receive();
-                             });
-        } catch (std::system_error &err) {
-            logger->critical("SYSTEM ERROR HERE {}{}", __LINE__, err.what());
-            throw;
-        }
-    }
-
-    void receive() {
-        try {
-            asio::error_code err;
-            std::istream in(&resp_sbuf);
-
-            while (resp_sbuf.size() < size_ && !err) {
-                asio::read(s_, resp_sbuf, asio::transfer_at_least(1), err);
-            }
-            if (err && err != asio::error::eof) {
-                logger->error("Error when reading message: {}", err.message());
-            }
-
-            logger->debug("Read: {}", spdlog::to_hex((char *) resp_sbuf.data().data(),
-                                                     (char *) resp_sbuf.data().data() + resp_sbuf.size()));
-
-            auto ret = make_shared<bytes>(size_, 0);
-            in.read(reinterpret_cast<char *> (&(*ret)[0]), size_);
-
-            logger->debug("Read: {}", spdlog::to_hex(*ret));
-        } catch (std::system_error &err) {
-            logger->critical("SYSTEM ERROR HERE {}{}", __LINE__, err.what());
-            throw;
-        }
-    }
-
-    tcp::socket s_;
-    tcp::resolver resolver_;
-    asio::streambuf resp_sbuf;
-    uint16_t port_;
-    uint32_t size_;
-};
 
 string generate_dummy_string(size_t length) {
     static char charset[] = "0123456789abcdef";
@@ -187,65 +27,119 @@ string generate_dummy_string(size_t length) {
     return out;
 }
 
+#include <list>
+#include <utility>
+
+using std::list;
+
+class ClientPool {
+public:
+    ClientPool(ptr<asio::io_context> io_context_ptr, uint16_t port)
+            : io_context_ptr_(std::move(io_context_ptr)), port_(port) {}
+
+    ptr<SocketClient> get_client() {
+        for (auto it = pool_.begin(); it != pool_.end(); it++) {
+            if ((*it)->status() == SocketClient::AVAILABLE) {
+                return (*it);
+            } else if ((*it)->status() == SocketClient::ERROR) {
+                pool_.erase(it);
+            }
+        }
+
+        pool_.emplace_back(std::make_shared<SocketClient>(io_context_ptr_, port_));
+
+        return pool_.back();
+    }
+
+private:
+    ptr<asio::io_context> io_context_ptr_;
+    uint16_t port_;
+    list<ptr<SocketClient>> pool_;
+};
+
+ptr<asio::io_context> io_context_ptr;
+
 
 int main(int argc, const char *argv[]) {
     logger = spdlog::stdout_color_mt("client");
     spdlog::set_level(spdlog::level::trace);
     spdlog::set_pattern("%^[%H:%M:%S.%f] %n @ %t [%l]%$ %v");
 
-
-    auto io_context_ptr = std::make_shared<asio::io_context>();
+    io_context_ptr = std::make_shared<asio::io_context>();
 
     uint16_t leader_id = 1;
 
 
-    int32_t interval = 500;
+    double interval = 500;
 
     if (argc > 1) {
-        interval = atoi(argv[1]);
+        interval = atof(argv[1]);
     }
 
-#if 1
+#if 0
 
     string dummy = generate_dummy_string(256);
-    const bytes log(dummy.begin(), dummy.end());
-    auto request = serialize(client_append_entries_req, append_entries(vector<bytes>{log}));
-    logger->info("\tsending request {}", dummy);
+    auto request = RequestBuilder::append_entries(dummy);
 
-    auto client = std::make_shared<SocketClient>(*io_context_ptr, 9000 + leader_id);
-    client->send(*request);
+    auto client = std::make_shared<SocketClient>(io_context_ptr, 9000 + leader_id);
+    logger->info("sending request {}", dummy);
+    client->send(request);
     std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(interval));
+
 
 #else
 
     for (int32_t i = 2; i <= 5; i++) {
-        auto request = serialize(client_add_srv_req, add_server(i));
+        auto request = RequestBuilder::add_server(i);
+        auto client = std::make_shared<SocketClient>(io_context_ptr, 9000 + leader_id);
         logger->info("\tadding server {}", i);
-        auto client = std::make_shared<SocketClient>(*io_context_ptr, 9000 + leader_id);
-        client->send(*request);
+        client->send(request);
         std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(500));
     }
 
-    while (true) {
-        try {
-            string dummy = generate_dummy_string(256);
-            const bytes log(dummy.begin(), dummy.end());
-            auto request = serialize(client_append_entries_req, append_entries(vector<bytes>{log}));
-            logger->info("\tsending request {}", dummy);
+    std::thread tt([interval, &leader_id]() {
+        ClientPool pool(io_context_ptr, 9000 + leader_id);
 
-            auto client = std::make_shared<SocketClient>(*io_context_ptr, 9000 + leader_id);
-            client->send(*request);
-            std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(interval));
+        while (true) {
+            try {
+                string dummy = generate_dummy_string(256);
+                auto request = RequestBuilder::append_entries(dummy);
 
-        } catch (std::runtime_error &err) {
-            logger->error(err.what());
+                auto client = pool.get_client();
+                logger->info("sending request {}", dummy);
+                client->send(request);
+
+            } catch (std::runtime_error &err) {
+                logger->error(err.what());
+            }
+
+            if (interval >= 1) {
+                std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(int(interval)));
+            } else if (interval > 0) {
+                std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::nano>(int(1000 * interval)));
+            }
         }
+    });
 
-        if (interval > 0) {
-            std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(interval));
-        }
-//        break;
-    }
+    tt.detach();
 
 #endif
+
+#if 0
+    unsigned int cpu_cnt = std::thread::hardware_concurrency() - 1;
+    vector<std::thread> thread_pool;
+    for (unsigned int i = 0; i < cpu_cnt; ++i) {
+        thread_pool.emplace_back([] {
+            io_context_ptr->run();
+        });
+    }
+
+    for (auto &thread :thread_pool) {
+        thread.join();
+    }
+#else
+    io_context_ptr->run();
+#endif
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
 }

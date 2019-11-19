@@ -73,6 +73,7 @@ find_package(OpenSSL)
 file(GLOB TEST_CLIENT_SRCS client/*.cxx)
 
 add_executable(client ${TEST_CLIENT_SRCS} ${C_COMMON_SRCS} raft_enclave/raft/src/buffer.cxx)
+target_compile_options(client PRIVATE -g)
 target_link_libraries(client PRIVATE OpenSSL::Crypto)
 target_link_libraries(client PRIVATE spdlog::spdlog)
 target_link_libraries(client PRIVATE json11)
