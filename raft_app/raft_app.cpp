@@ -37,7 +37,12 @@ int main(int argc, char const *argv[]) {
     /* initialise global variables */
     global_io_context = make_shared<asio::io_context>();
     global_logger = spdlog::stdout_color_mt(fmt::format("server_{}", srv_id));
+#ifdef DEBUG
+    global_logger->set_level(spdlog::level::trace);
+#else
     global_logger->set_level(spdlog::level::info);
+#endif
+
     global_logger->set_pattern("%^[%H:%M:%S.%f] %n @ %t [%l]%$ %v");
     global_rpc_listener = make_shared<asio_rpc_listener>(global_io_context, 9000 + srv_id);
 
