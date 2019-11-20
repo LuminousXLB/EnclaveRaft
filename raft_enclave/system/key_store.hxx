@@ -21,6 +21,11 @@ using cornerstone::srv_config;
 extern ptr<msg_handler> raft_rpc_request_handler;
 
 class er_key_store : public std::enable_shared_from_this<er_key_store> {
+    struct server_info {
+        sgx_ec256_public_t public_key;
+
+        explicit server_info(sgx_ec256_public_t pk) : public_key(pk) {}
+    };
 
 public:
     er_key_store(const sgx_ec256_private_t &private_key, const sgx_ec256_public_t &public_key) :
@@ -39,8 +44,8 @@ public:
     void build_key_xchg_req(int32_t server_id, const string &endpoint) {
         p_logger->debug("TRACE er_key_store::" + string(__FUNCTION__) + " " + endpoint);
 
-        if (store_.find(server_id) != store_.end()) {
-            /* attested or attesting */
+        auto info = query_server(server_id);
+        if (info != nullptr) {
             raft_rpc_request_handler->add_srv(make_shared<srv_config>(server_id, endpoint));
             return;
         }
@@ -94,7 +99,9 @@ public:
         p_logger->debug("TRACE er_key_store::" + string(__FUNCTION__) + " " + std::to_string(__LINE__));
         p_logger->debug("TRACE er_key_store::" + string(__FUNCTION__) + " " + endpoint);
 
-        raft_rpc_request_handler->add_srv(make_shared<srv_config>(server_id, endpoint));
+        if (result) {
+            raft_rpc_request_handler->add_srv(make_shared<srv_config>(server_id, endpoint));
+        }
     }
 
     bool receive_report(int32_t server_id, const char *http_packet) {
@@ -123,15 +130,22 @@ public:
 private:
     static ptr<bytes> validate_verification_report(const char *http_packet);
 
+    ptr<server_info> query_server(int32_t server_id) {
+        {
+            lock_guard<mutex> lock(temp_connections_lock_);
+            auto it = store_.find(server_id);
+            if (it != store_.end()) {
+                return it->second;
+            } else {
+                return nullptr;
+            }
+        }
+    }
+
     string self_report_;
     sgx_ec256_private_t self_private_;
     sgx_ec256_public_t self_public_;
 
-    struct server_info {
-        sgx_ec256_public_t public_key;
-
-        explicit server_info(sgx_ec256_public_t pk) : public_key(pk) {}
-    };
 
     map<int32_t, ptr<server_info>> store_;
     mutex store_lock_;

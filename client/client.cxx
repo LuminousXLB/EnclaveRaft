@@ -110,7 +110,8 @@ int main(int argc, const char *argv[]) {
             auto client = std::make_shared<SocketClient>(io_context_ptr, 9000 + leader_id);
             logger->info("\tadding server {}", i);
             client->send(request);
-            std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(200));
+            std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(500));
+            return 0;
         }
     }
 

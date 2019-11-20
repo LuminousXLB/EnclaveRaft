@@ -34,6 +34,8 @@ using tcp_resolver = asio::ip::tcp::resolver;
 extern sgx_enclave_id_t global_enclave_id;
 extern ptr<spdlog::logger> global_logger;
 
+uint8_t dummy;
+
 class asio_rpc_client : public std::enable_shared_from_this<asio_rpc_client> {
 public:
     asio_rpc_client(asio::io_service &io_svc, std::string &host, std::string &port, uint32_t client_uid)
@@ -58,7 +60,7 @@ public:
 private:
     void handle_error(uint32_t request_uid, asio::error_code err, const string &detail) {
         string e = fmt::format("[client #{}] {} due to error [{}] {}", client_uid_, detail, err.value(), err.message());
-        ecall_rpc_response(global_enclave_id, request_uid, 0, nullptr, e.c_str());
+        ecall_rpc_response(global_enclave_id, request_uid, 0, &dummy, e.c_str());
         if (socket_.is_open()) {
             socket_.close();
         }

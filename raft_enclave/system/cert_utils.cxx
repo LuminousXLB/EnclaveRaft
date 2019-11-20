@@ -103,10 +103,6 @@ bool cert_verify(X509_STORE *store, sk_X509 *chain) {
     return rv;
 }
 
-#include "raft_enclave_u.h"
-#include "cppcodec/hex_default_lower.hpp"
-#include "cppcodec/base64_default_rfc4648.hpp"
-
 bool sha256_verify(const uint8_t *msg, size_t msgsz, const uint8_t *sig, size_t sigsz, EVP_PKEY *pkey) {
     ptr<EVP_MD_CTX> ctx = ptr<EVP_MD_CTX>(EVP_MD_CTX_new(), EVP_MD_CTX_free);
     if (ctx == nullptr || ctx.get() == nullptr) {
