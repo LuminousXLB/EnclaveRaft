@@ -33,3 +33,4 @@
 .idea
 cmake-build-debug
 common/secret.h
+.env
