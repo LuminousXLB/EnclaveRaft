@@ -61,20 +61,35 @@ ptr<asio::io_context> io_context_ptr;
 
 
 int main(int argc, const char *argv[]) {
-    logger = spdlog::stdout_color_mt("client");
-    spdlog::set_level(spdlog::level::trace);
+    uint8_t client_id = 1;
+    unsigned interval = 500;
+    uint32_t payload_size = 256;
+
+    if (argc < 2) {
+        // do nothing
+    } else if (argc == 2) {
+        client_id = strtoul(argv[1], nullptr, 10);
+    } else if (argc == 3) {
+        client_id = strtoul(argv[1], nullptr, 10);
+        interval = strtoul(argv[2], nullptr, 10);
+    } else if (argc == 4) {
+        client_id = strtoul(argv[1], nullptr, 10);
+        interval = strtoul(argv[2], nullptr, 10);
+        payload_size = strtoul(argv[3], nullptr, 10);
+    } else {
+        fprintf(stderr, "Usage: \n");
+        fprintf(stderr, "    %s <server_id>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+
+    logger = spdlog::stdout_color_mt(fmt::format("client_{}", client_id));
+    spdlog::set_level(spdlog::level::info);
     spdlog::set_pattern("%^[%H:%M:%S.%f] %n @ %t [%l]%$ %v");
 
     io_context_ptr = std::make_shared<asio::io_context>();
 
-    uint16_t leader_id = 1;
-
-
-    double interval = 500;
-
-    if (argc > 1) {
-        interval = atof(argv[1]);
-    }
+    int32_t leader_id = 1;
 
 #if 0
 
@@ -84,39 +99,45 @@ int main(int argc, const char *argv[]) {
     auto client = std::make_shared<SocketClient>(io_context_ptr, 9000 + leader_id);
     logger->info("sending request {}", dummy);
     client->send(request);
-    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(interval));
+    std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(int(interval)));
 
 
 #else
 
-    for (int32_t i = 2; i <= 5; i++) {
-        auto request = RequestBuilder::add_server(i);
-        auto client = std::make_shared<SocketClient>(io_context_ptr, 9000 + leader_id);
-        logger->info("\tadding server {}", i);
-        client->send(request);
-        std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(500));
+    if (client_id == 1) {
+        for (int32_t i = 2; i <= 5; i++) {
+            auto request = RequestBuilder::add_server(i);
+            auto client = std::make_shared<SocketClient>(io_context_ptr, 9000 + leader_id);
+            logger->info("\tadding server {}", i);
+            client->send(request);
+            std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(200));
+        }
     }
 
-    std::thread tt([interval, &leader_id]() {
+    std::thread tt([&interval, &leader_id, payload_size]() {
         ClientPool pool(io_context_ptr, 9000 + leader_id);
 
         while (true) {
             try {
-                string dummy = generate_dummy_string(256);
+                string dummy = generate_dummy_string(payload_size);
                 auto request = RequestBuilder::append_entries(dummy);
 
+                string msg = dummy;
+                if (msg.length() > 64) {
+                    msg.resize(64);
+                }
+
                 auto client = pool.get_client();
-                logger->info("sending request {}", dummy);
+                logger->info("sending request {}", msg);
                 client->send(request);
 
             } catch (std::runtime_error &err) {
+                interval *= 2;
                 logger->error(err.what());
             }
 
             if (interval >= 1) {
-                std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(int(interval)));
-            } else if (interval > 0) {
-                std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::nano>(int(1000 * interval)));
+                std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(interval));
             }
         }
     });
