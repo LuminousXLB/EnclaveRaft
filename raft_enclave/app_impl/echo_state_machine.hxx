@@ -41,12 +41,22 @@ public:
     ~echo_state_machine() override = default;
 
     void pre_commit(const ulong log_idx, buffer &data) override {
-        string put = strfmt<512>("PRE_COMMIT %lu %s").fmt(log_idx, data.get_str());
+        string msg = data.get_str();
+        if (msg.length() > 64) {
+            msg.resize(64);
+        }
+
+        string put = strfmt<512>("PRE_COMMIT %lu %s").fmt(log_idx, msg.c_str());
         ocall_print_log(LOG_LEVEL_INFO, put.c_str());
     }
 
     void commit(const ulong log_idx, buffer &data) override {
-        string put = strfmt<512>("COMMIT %lu %s").fmt(log_idx, data.get_str());
+        string msg = data.get_str();
+        if (msg.length() > 64) {
+            msg.resize(64);
+        }
+
+        string put = strfmt<512>("COMMIT %lu %s").fmt(log_idx, msg.c_str());
         ocall_print_log(LOG_LEVEL_INFO, put.c_str());
 
         last_committed_idx_ = log_idx;
