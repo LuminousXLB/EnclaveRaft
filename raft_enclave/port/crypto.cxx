@@ -4,7 +4,6 @@
 
 #include "crypto.hxx"
 #include <memory>
-#include <vector>
 #include <sgx_tcrypto.h>
 #include "aes_ctr_crypto.hxx"
 #include "../raft/include/cornerstone.hxx"
@@ -19,8 +18,12 @@ byte *get_key() {
     return SECRET;
 }
 
+//#define CRYPTO_DISABLED
 
 ptr<bytes> raft_encrypt(const uint8_t *data, uint32_t size) {
+#ifdef CRYPTO_DISABLED
+    return std::make_shared<bytes>(data, data + size);
+#else
     p_logger->debug(std::string("Encrypt <- Plaintext: ") + hex::encode(data, size));
 
     byte iv[S_BLOCK_SIZE];
@@ -34,11 +37,14 @@ ptr<bytes> raft_encrypt(const uint8_t *data, uint32_t size) {
     } else {
         p_logger->err("ENCRYPTION FAILED");
     }
-
     return enc;
+#endif
 }
 
 ptr<bytes> raft_decrypt(const uint8_t *data, uint32_t size) {
+#ifdef CRYPTO_DISABLED
+    return std::make_shared<bytes>(data, data + size);
+#else
     p_logger->debug(std::string("Decrypt <- Ciphertext: ") + hex::encode(data, size));
 
     auto dec = aes_ctr_decrypt(get_key(), data, data + S_BLOCK_SIZE, size - S_BLOCK_SIZE);
@@ -50,4 +56,5 @@ ptr<bytes> raft_decrypt(const uint8_t *data, uint32_t size) {
     }
 
     return dec;
+#endif
 }

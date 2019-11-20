@@ -123,7 +123,7 @@ ptr<bytes> handle_client_request(er_message_type type, const string &payload) {
             {
                 int32_t server_id = body["server_id"].int_value();
                 string endpoint = body["endpoint"].string_value();
-                auto srv_cfg = make_shared<srv_config>(server_id, endpoint);
+//                auto srv_cfg = make_shared<srv_config>(server_id, endpoint);
 
                 p_logger->debug(lstrfmt("%s -> %s %d").fmt(__FUNCTION__, endpoint.c_str(), server_id));
 

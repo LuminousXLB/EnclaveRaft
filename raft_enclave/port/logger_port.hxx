@@ -15,7 +15,13 @@ using std::string;
 
 class LoggerPort : public cornerstone::logger {
     static void log(unsigned level, const string &message) {
+#ifdef DEBUG
         ocall_print_log(level, message.c_str());
+#else
+        if (level >= LOG_LEVEL_INFO) {
+            ocall_print_log(level, message.c_str());
+        }
+#endif
     }
 
 public:
