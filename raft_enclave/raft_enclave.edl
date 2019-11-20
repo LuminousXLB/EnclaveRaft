@@ -1,10 +1,10 @@
 enclave {
-    from "sgx_tsgxssl.edl" import *;
     from "sgx_tae_service.edl" import *;
-  	from "sgx_tkey_exchange.edl" import *;
+    from "sgx_tkey_exchange.edl" import *;
+    from "sgx_tsgxssl.edl" import *;
 
-	include "sgx_trts.h"
-	include "sgx_key_exchange.h"
+    include "sgx_trts.h"
+    include "sgx_key_exchange.h"
     include "log_level.hxx"
     include "stdbool.h"
 
