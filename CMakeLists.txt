@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(EnclaveRaft)
 
 set(CMAKE_CXX_STANDARD 11)
+#set(SGX_MODE Debug)
 
 # Intel SGX
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
@@ -73,7 +74,6 @@ find_package(OpenSSL)
 file(GLOB TEST_CLIENT_SRCS client/*.cxx)
 
 add_executable(client ${TEST_CLIENT_SRCS} ${C_COMMON_SRCS} raft_enclave/raft/src/buffer.cxx)
-target_compile_options(client PRIVATE -g)
 target_link_libraries(client PRIVATE OpenSSL::Crypto)
 target_link_libraries(client PRIVATE spdlog::spdlog)
 target_link_libraries(client PRIVATE json11)
