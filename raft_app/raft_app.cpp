@@ -6,24 +6,22 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <memory>
 #include <string>
-#include "system/enclave_quote.hxx"
-#include "system/intel_ias.hxx"
 #include "secret.h"
 #include "cppcodec/base64_default_rfc4648.hpp"
 #include "port/asio_rpc_listener.hxx"
 
 using std::thread;
 
-/* Global Enclave ID */
-sgx_enclave_id_t global_enclave_id;
+/* Global States */
 ptr<asio::io_context> global_io_context;
 ptr<spdlog::logger> global_logger;
 ptr<asio_rpc_listener> global_rpc_listener;
+
+sgx_enclave_id_t global_enclave_id;
 string attestation_verification_report;
 
-int main(int argc, char const *argv[]) {
-    /* parse command line parameter and get srv_id */
-    uint8_t srv_id = 1;
+int32_t parse_args(int argc, char const *argv[]) {
+    int32_t srv_id = 1;
     if (argc < 2) {
         // do nothing
     } else if (argc == 2) {
@@ -34,16 +32,27 @@ int main(int argc, char const *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    /* initialise global variables */
-    global_io_context = make_shared<asio::io_context>();
-    global_logger = spdlog::stdout_color_mt(fmt::format("server_{}", srv_id));
-#ifdef DEBUG
-    global_logger->set_level(spdlog::level::trace);
-#else
-    global_logger->set_level(spdlog::level::info);
-#endif
+    return srv_id;
+}
 
-    global_logger->set_pattern("%^[%H:%M:%S.%f] %n @ %t [%l]%$ %v");
+ptr<spdlog::logger> get_logger(const string &name, spdlog::level::level_enum level) {
+    auto logger = spdlog::stdout_color_mt(name);
+    logger->set_level(level);
+    logger->set_pattern("%^[%H:%M:%S.%f] %n @ %t [%l]%$ %v");
+    return logger;
+}
+
+int main(int argc, char const *argv[]) {
+    /* parse command line parameter and get srv_id */
+    int32_t srv_id = parse_args(argc, argv);
+
+    /* initialise global variables */
+#ifdef DEBUG
+    global_logger = get_logger(fmt::format("server_{}", srv_id), spdlog::level::trace);
+#else
+    global_logger = get_logger(fmt::format("server_{}", srv_id), spdlog::level::info);
+#endif
+    global_io_context = make_shared<asio::io_context>();
     global_rpc_listener = make_shared<asio_rpc_listener>(global_io_context, 9000 + srv_id);
 
     /* initialise enclave */

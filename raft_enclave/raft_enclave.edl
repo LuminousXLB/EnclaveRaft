@@ -2,6 +2,7 @@ enclave {
     from "sgx_tae_service.edl" import *;
     from "sgx_tkey_exchange.edl" import *;
     from "sgx_tsgxssl.edl" import *;
+    from "od_attestation.edl" import *;
 
     include "sgx_trts.h"
     include "sgx_key_exchange.h"
@@ -22,10 +23,6 @@ enclave {
 
         /* asio_rpc_client.hxx => rpc_client_port.cxx */
         public void ecall_rpc_response(uint32_t req_uid, uint32_t size, [in, size=size] const uint8_t *msg, [in, string] const char *exception);
-
-        /* attestation */
-        public sgx_status_t ecall_get_report([in] sgx_target_info_t *target_info, [out] sgx_report_t *report);
-        public bool ecall_register_verification_report([in, string] const char * http_packet);
     };
 
     untrusted {
@@ -47,5 +44,9 @@ enclave {
         uint32_t ocall_rpc_client_create([in, string] const char *endpoint);
         void ocall_rpc_client_close(uint32_t client_uid);
         void ocall_send_rpc_request(uint32_t client_uid, uint32_t size, [in, size=size] const uint8_t *message, uint32_t request_uid);
+
+        /* attestation */
+        uint32_t ocall_ias_request(uint32_t context_id, [in, string] const char *isvEnclaveQuote_b64);
+        void ocall_get_response(uint32_t context_id, [out, size=response_size] char *response, int32_t response_size);
     };
 };

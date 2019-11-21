@@ -7,9 +7,9 @@ include(CMakeParseArguments)
 
 set(SGX_FOUND "NO")
 
-if (EXISTS SGX_DIR)
+if (SGX_DIR)
     set(SGX_PATH ${SGX_DIR})
-elseif (EXISTS SGX_ROOT)
+elseif (SGX_ROOT)
     set(SGX_PATH ${SGX_DIR})
 elseif (EXISTS $ENV{SGX_SDK})
     set(SGX_PATH $ENV{SGX_SDK})
@@ -26,17 +26,18 @@ message(STATUS " * SGX_PATH = ${SGX_PATH}")
 if (CMAKE_SIZEOF_VOID_P EQUAL 4)
     set(SGX_COMMON_CFLAGS -m32)
     set(SGX_LIBRARY_PATH ${SGX_PATH}/lib32)
-    set(SGX_ENCLAVE_SIGNER ${SGX_PATH}/bin/x86/sgx_sign)
-    set(SGX_EDGER8R ${SGX_PATH}/bin/x86/sgx_edger8r)
+    find_program(SGX_ENCLAVE_SIGNER sgx_sign ${SGX_PATH}/bin/x86)
+    find_program(SGX_EDGER8R sgx_edger8r ${SGX_PATH}/bin/x86)
 else ()
     set(SGX_COMMON_CFLAGS -m64)
     set(SGX_LIBRARY_PATH ${SGX_PATH}/lib64)
-    set(SGX_ENCLAVE_SIGNER ${SGX_PATH}/bin/x64/sgx_sign)
-    set(SGX_EDGER8R ${SGX_PATH}/bin/x64/sgx_edger8r)
+    find_program(SGX_ENCLAVE_SIGNER sgx_sign ${SGX_PATH}/bin/x64)
+    find_program(SGX_EDGER8R sgx_edger8r ${SGX_PATH}/bin/x64)
 endif ()
 
-find_path(SGX_INCLUDE_DIR sgx.h "${SGX_PATH}/include" NO_DEFAULT_PATH)
-find_path(SGX_LIBRARY_DIR libsgx_urts.so "${SGX_LIBRARY_PATH}" NO_DEFAULT_PATH)
+find_path(SGX_INCLUDE_DIR sgx.h PATHS "${SGX_PATH}/include" NO_DEFAULT_PATH)
+find_path(SGX_LIBRARY_DIR libsgx_urts.so PATHS "${SGX_PATH}/lib64" NO_DEFAULT_PATH)
+
 message(STATUS " * SGX_INCLUDE_DIR = ${SGX_INCLUDE_DIR}")
 message(STATUS " * SGX_LIBRARY_DIR = ${SGX_LIBRARY_DIR}")
 
@@ -49,6 +50,13 @@ if (SGX_INCLUDE_DIR AND SGX_LIBRARY_DIR)
     mark_as_advanced(SGX_INCLUDE_DIR SGX_TLIBC_INCLUDE_DIR SGX_LIBCXX_INCLUDE_DIR SGX_LIBRARY_DIR)
     message(STATUS "Found Intel SGX SDK.")
 endif ()
+
+message(STATUS " * SGX_ENCLAVE_SIGNER = ${SGX_ENCLAVE_SIGNER}")
+message(STATUS " * SGX_EDGER8R = ${SGX_EDGER8R}")
+message(STATUS " * SGX_INCLUDE_DIR = ${SGX_INCLUDE_DIR}")
+message(STATUS " * SGX_LIBRARY_DIR = ${SGX_LIBRARY_DIR}")
+message(STATUS " * SGX_FOUND = ${SGX_FOUND}")
+
 
 if (SGX_FOUND)
     set(SGX_HW ON CACHE BOOL "Run SGX on hardware, OFF for simulation.")
@@ -80,13 +88,13 @@ if (SGX_FOUND)
     set(ENCLAVE_C_FLAGS "${SGX_COMMON_CFLAGS} -nostdinc -fvisibility=hidden -fpie -fstack-protector-strong ${ENCLAVE_INC_FLAGS}")
     set(ENCLAVE_CXX_FLAGS "${ENCLAVE_C_FLAGS} -nostdinc++")
 
-    set(APP_INC_FLAGS "-I${SGX_PATH}/include")
+    set(APP_INC_FLAGS "-I${SGX_INCLUDE_DIR}")
     set(APP_C_FLAGS "${SGX_COMMON_CFLAGS} -fPIC -Wno-attributes ${APP_INC_FLAGS}")
     set(APP_CXX_FLAGS "${APP_C_FLAGS}")
 
 
     # begin: find sgx_ssl
-    if (EXISTS SGXSSL_SDK)
+    if (SGXSSL_SDK)
         set(SGXSSL_PATH ${SGXSSL_SDK})
     elseif (EXISTS $ENV{SGXSSL_SDK})
         set(SGXSSL_PATH $ENV{SGXSSL_SDK})
@@ -107,18 +115,22 @@ if (SGX_FOUND)
 
     if (SGXSSL_INCLUDE_DIR AND SGXSSL_LIBRARY_DIR)
         set(SGX_SSL_FOUND "YES")
-        set(SGXSSL_INCLUDE_DIR "${SGXSSL_PATH}/include" CACHE PATH "Intel SGX SSL include directory" FORCE)
-        set(SGXSSL_LIBRARY_DIR "${SGXSSL_PATH}/lib64" CACHE PATH "Intel SGX SSL library directory" FORCE)
+        set(SGXSSL_INCLUDE_DIR "${SGXSSL_INCLUDE_DIR}" CACHE PATH "Intel SGX SSL include directory" FORCE)
+        set(SGXSSL_LIBRARY_DIR "${SGXSSL_LIBRARY_DIR}" CACHE PATH "Intel SGX SSL library directory" FORCE)
         mark_as_advanced(SGXSSL_INCLUDE_DIR SGXSSL_LIBRARY_DIR)
         message(STATUS "Found Intel SGX SSL SDK.")
     endif ()
     # end: find sgx_ssl
 
-    function(_build_edl_obj edl edl_search_paths use_prefix)
+    function(_build_edl_obj edl)
+        set(optionArgs _USE_PREFIX)
+        set(multiValueArgs _EDL_SEARCH_PATHS)
+        cmake_parse_arguments("SGX" "${optionArgs}" "" "${multiValueArgs}" ${ARGN})
+
         message(STATUS "DEBUG: in <_build_edl_obj>")
         message(STATUS "       [edl             ] ${edl}")
-        message(STATUS "       [edl_search_paths] ${edl_search_paths}")
-        message(STATUS "       [use_prefix      ] ${use_prefix}")
+        message(STATUS "       [edl_search_paths] ${SGX__EDL_SEARCH_PATHS}")
+        message(STATUS "       [use_prefix      ] ${SGX__USE_PREFIX}")
         message(STATUS "       [var:SGX_INCLUDE_DIR] ${SGX_INCLUDE_DIR}")
 
         get_filename_component(EDL_NAME ${edl} NAME_WE)
@@ -126,15 +138,15 @@ if (SGX_FOUND)
         set(EDL_T_C "${CMAKE_CURRENT_BINARY_DIR}/${EDL_NAME}_t.c")
         set(SEARCH_PATHS "")
 
-        foreach (path ${edl_search_paths})
+        foreach (path ${SGX__EDL_SEARCH_PATHS})
             get_filename_component(ABSPATH ${path} ABSOLUTE)
             list(APPEND SEARCH_PATHS "${ABSPATH}")
         endforeach ()
-        list(APPEND SEARCH_PATHS "${SGX_PATH}/include")
+        list(APPEND SEARCH_PATHS "${SGX_INCLUDE_DIR}")
         list(APPEND SEARCH_PATHS "${SGXSSL_INCLUDE_DIR}")
 
         string(REPLACE ";" ":" SEARCH_PATHS "${SEARCH_PATHS}")
-        if (${use_prefix})
+        if (${SGX__USE_PREFIX})
             set(USE_PREFIX "--use-prefix")
         endif ()
 
@@ -171,17 +183,23 @@ if (SGX_FOUND)
             get_filename_component(LDS_ABSPATH ${SGX_LDSCRIPT} ABSOLUTE)
             set(LDSCRIPT_FLAG "-Wl,--version-script=${LDS_ABSPATH}")
         endif ()
+        if ("${USE_PREFIX}" STREQUAL "")
+            set(SGX_USE_PREFIX NO)
+        else ()
+            set(SGX_USE_PREFIX ${USE_PREFIX})
+        endif ()
 
-        _build_edl_obj(${SGX_EDL} ${SGX_EDL_SEARCH_PATHS} ${SGX_USE_PREFIX})
+        message(STATUS "add_trusted_library::_build_edl_obj SGX_EDL_SEARCH_PATHS = ${SGX_EDL_SEARCH_PATHS}")
+        _build_edl_obj(${SGX_EDL} _EDL_SEARCH_PATHS ${SGX_EDL_SEARCH_PATHS} _USE_PREFIX ${SGX_USE_PREFIX})
 
         add_library(${target} STATIC ${SGX_SRCS} $<TARGET_OBJECTS:${target}-edlobj>)
         set_target_properties(${target} PROPERTIES COMPILE_FLAGS ${ENCLAVE_CXX_FLAGS})
         target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
         target_link_libraries(${target} "${SGX_COMMON_CFLAGS} \
-            -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L${SGX_LIBRARY_PATH} \
-            -Wl,--whole-archive -l${SGX_TRTS_LIB} -Wl,--no-whole-archive \
-            -Wl,--start-group -lsgx_tstdc -lsgx_tcxx -lsgx_tkey_exchange -lsgx_tcrypto -l${SGX_TSVC_LIB} -Wl,--end-group \
+            -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L${SGX_LIBRARY_PATH} -L${SGXSSL_LIBRARY_DIR} \
+            -Wl,--no-whole-archive \
+            -Wl,--start-group ${TLIB_LIST} -lsgx_tstdc -lsgx_tcxx -lsgx_tkey_exchange -lsgx_tcrypto -l${SGX_TSVC_LIB} -lsgx_tsgxssl_crypto -Wl,--end-group \
             -Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
             -Wl,-pie,-eenclave_entry -Wl,--export-dynamic \
             ${LDSCRIPT_FLAG} \
@@ -214,7 +232,7 @@ if (SGX_FOUND)
             set(LDSCRIPT_FLAG "-Wl,--version-script=${LDS_ABSPATH}")
         endif ()
 
-        _build_edl_obj(${SGX_EDL} ${SGX_EDL_SEARCH_PATHS} ${SGX_USE_PREFIX})
+        _build_edl_obj(${SGX_EDL} _EDL_SEARCH_PATHS ${SGX_EDL_SEARCH_PATHS} _USE_PREFIX ${SGX_USE_PREFIX})
 
         add_library(${target} SHARED ${SGX_SRCS} $<TARGET_OBJECTS:${target}-edlobj>)
         set_target_properties(${target} PROPERTIES COMPILE_FLAGS ${ENCLAVE_CXX_FLAGS})
@@ -228,9 +246,8 @@ if (SGX_FOUND)
             add_dependencies(${target} ${TLIB})
         endforeach ()
 
-        #            -L${SGXSSL_LIBRARY_DIR} -Wl,--whole-archive -lsgx_tsgxssl -Wl,--no-whole-archive -lsgx_tsgxssl_crypto
         target_link_libraries(${target} "${SGX_COMMON_CFLAGS} \
-            -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L${SGX_LIBRARY_PATH} -L${SGXSSL_LIBRARY_DIR} \
+            -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L${SGX_LIBRARY_DIR} -L${SGXSSL_LIBRARY_DIR} \
             -Wl,--whole-archive \
             -Wl,--start-group -l${SGX_TRTS_LIB} -lsgx_tsgxssl -Wl,--end-group\
             -Wl,--no-whole-archive \
@@ -309,7 +326,7 @@ if (SGX_FOUND)
                 get_filename_component(ABSPATH ${path} ABSOLUTE)
                 list(APPEND SEARCH_PATHS "${ABSPATH}")
             endforeach ()
-            list(APPEND SEARCH_PATHS "${SGX_PATH}/include")
+            list(APPEND SEARCH_PATHS "${SGX_INCLUDE_DIR}")
             list(APPEND SEARCH_PATHS "${SGXSSL_INCLUDE_DIR}")
 
             string(REPLACE ";" ":" SEARCH_PATHS "${SEARCH_PATHS}")
@@ -327,7 +344,7 @@ if (SGX_FOUND)
         set_target_properties(${target} PROPERTIES COMPILE_FLAGS ${APP_CXX_FLAGS})
         target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(${target} "${SGX_COMMON_CFLAGS} \
-                                         -L${SGX_LIBRARY_PATH} \
+                                         -L${SGX_LIBRARY_DIR} \
                                          -l${SGX_URTS_LIB} \
                                          -l${SGX_USVC_LIB} \
                                          -lsgx_ukey_exchange \
@@ -360,7 +377,7 @@ if (SGX_FOUND)
                 get_filename_component(ABSPATH ${path} ABSOLUTE)
                 list(APPEND SEARCH_PATHS "${ABSPATH}")
             endforeach ()
-            list(APPEND SEARCH_PATHS "${SGX_PATH}/include")
+            list(APPEND SEARCH_PATHS "${SGX_INCLUDE_DIR}")
             list(APPEND SEARCH_PATHS "${SGXSSL_INCLUDE_DIR}")
 
             string(REPLACE ";" ":" SEARCH_PATHS "${SEARCH_PATHS}")
@@ -384,7 +401,7 @@ if (SGX_FOUND)
         message(STATUS "DEBUG: CMAKE_CURRENT_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}")
 
         target_link_libraries(${target} "${SGX_COMMON_CFLAGS} \
-                                         -L${SGX_LIBRARY_PATH} \
+                                         -L${SGX_LIBRARY_DIR} \
                                          -L${SGXSSL_LIBRARY_DIR} \
                                          -l${SGX_URTS_LIB} \
                                          -l${SGX_USVC_LIB} \

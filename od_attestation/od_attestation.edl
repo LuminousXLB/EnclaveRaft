@@ -1,0 +1,18 @@
+enclave {
+    include "sgx_trts.h"
+	include "sgx_key_exchange.h"
+    /*
+        from "sgx_tsgxssl.edl" import *;
+    	from "sgx_tkey_exchange.edl" import *;
+    */
+
+	trusted {
+	    public int od_register_verification_report_ecall(int32_t context_id, [in, string] const char * vreport);
+    };
+
+	untrusted {
+        sgx_status_t od_init_quote_ocall([out] sgx_target_info_t *target_info, [out] sgx_epid_group_id_t *epid_gid);
+        sgx_status_t od_calc_quote_size_ocall([out] uint32_t *quote_size);
+        sgx_status_t od_get_quote_ocall([in] const sgx_report_t *report, sgx_quote_sign_type_t type, [in] const sgx_spid_t *spid, uint32_t quote_size, [out, size=quote_size] uint8_t *quote);
+	};
+};

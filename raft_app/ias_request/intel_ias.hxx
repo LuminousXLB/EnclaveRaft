@@ -7,7 +7,6 @@
 
 #include "ssl_client.hxx"
 
-#include "common.hxx"
 #include <memory>
 #include <cstring>
 
@@ -15,10 +14,10 @@ using std::make_shared;
 
 static const char *host = "api.trustedservices.intel.com";
 static const char *protocol = "https";
-extern ptr<asio::io_context> global_io_context;
 
 class IntelIAS {
 public:
+    template<class T> using sptr = std::shared_ptr<T>;
 
     enum ENVIRONMENT {
         DEVELOPMENT,
@@ -28,10 +27,10 @@ public:
     IntelIAS(const string &primary_key, const string &secondary_key, ENVIRONMENT env = DEVELOPMENT)
             : env_(env),
               key({primary_key, secondary_key}),
-              io_context_(global_io_context),
-              ssl_context_(make_shared<asio::ssl::context>(asio::ssl::context::sslv23)) {
+              io_context_(),
+              ssl_context_(asio::ssl::context::sslv23) {
 
-        ssl_context_->load_verify_file("/etc/ssl/certs/ca-certificates.crt");
+        ssl_context_.load_verify_file("/etc/ssl/certs/ca-certificates.crt");
 
     }
 
@@ -42,16 +41,20 @@ public:
         uint8_t key_index = 0;
 
         string request;
-        request += fmt::format("POST {} HTTP/1.1", path) + "\r\n";
-        request += fmt::format("Host: {}", host) + "\r\n";
-        request += fmt::format("Content-Type: {}", "application/json") + "\r\n";
-        request += fmt::format("Ocp-Apim-Subscription-Key: {}", key[key_index]) + "\r\n";
-        request += fmt::format("Content-Length: {}", body.length()) + "\r\n";
+        request.append("POST ").append(path).append(" HTTP/1.1");
         request += "\r\n";
-        request += body;
+        request.append("Host: ").append(host);
+        request += "\r\n";
+        request.append("Content-Type: application/json");
+        request += "\r\n";
+        request.append("Ocp-Apim-Subscription-Key: ").append(key[key_index]);
+        request += "\r\n";
+        request.append("Content-Length: ").append(std::to_string(body.length()));
+        request += "\r\n\r\n";
+        request.append(body);
         request += "\r\n";
 
-        connection_ = make_shared<ssl_client>(*io_context_, *ssl_context_, host, protocol);
+        connection_ = make_shared<ssl_client>(io_context_, ssl_context_, host, protocol);
         return connection_->request(reinterpret_cast<const uint8_t *>(request.data()), request.size());
     }
 
@@ -69,9 +72,9 @@ public:
 
 private:
     ENVIRONMENT env_;
-    ptr<asio::io_context> io_context_;
-    ptr<asio::ssl::context> ssl_context_;
-    ptr<ssl_client> connection_;
+    asio::io_context io_context_;
+    asio::ssl::context ssl_context_;
+    sptr<ssl_client> connection_;
     array<string, 2> key;
 };
 

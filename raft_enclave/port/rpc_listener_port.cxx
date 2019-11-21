@@ -11,8 +11,7 @@
 #include "rpc_listener_port.hxx"
 #include "crypto.hxx"
 #include "messages.hxx"
-#include "../system/key_store.hxx"
-//#include <cppcodec/hex_default_lower.hpp>
+#include "../raft_enclave.hxx"
 
 using std::map;
 using std::mutex;
@@ -33,45 +32,43 @@ using cornerstone::log_val_type;
 using cornerstone::resp_msg;
 using cornerstone::lstrfmt;
 
-ptr<msg_handler> raft_rpc_request_handler;
+extern app_context_t g;
 
 static mutex message_buffer_lock;
 static atomic<uint32_t> id_counter;
 static map<uint32_t, shared_ptr<vector<uint8_t>>> response_buffer_map;
 extern string attestation_verification_report;
-extern ptr<er_key_store> key_store;
 
-ptr<bytes> handle_client_request(er_message_type type, const string &payload);
+ptr<bytes> handle_client_request(const erMessageMold *message);
 
-ptr<bytes> handle_system_request(er_message_type type, const string &payload);
+ptr<bytes> handle_system_request(const erMessageMold *message);
 
-ptr<bytes> handle_raft_message(const uint8_t *data, uint32_t size);
+ptr<bytes> handle_raft_message(const erMessageMold *message);
 
 int32_t ecall_handle_rpc_request(uint32_t size, const uint8_t *message, uint32_t *msg_id) {
     p_logger->debug(lstrfmt("ecall_handle_rpc_request -> %d %s").fmt(size, hex::encode(message, size).c_str()));
 
-    auto type = static_cast<er_message_type>(*(uint16_t *) message);
+    auto msg = reinterpret_cast<const erMessageMold * >(message);
 
     ptr<bytes> response = nullptr;
 
-    switch (type) {
+    switch (msg->header.m_type) {
         case client_add_srv_req:
         case client_remove_srv_req:
-        case client_append_entries_req:;
-            response = handle_client_request(type, string(message + sizeof(uint16_t), message + size));
+        case client_append_entries_req:
+            response = handle_client_request(msg);
             break;
         case system_key_exchange_req:
         case system_key_setup_req:
-            response = handle_system_request(type, string(message + sizeof(uint16_t), message + size));
+            response = handle_system_request(msg);
             break;
         case raft_message:
-            response = handle_raft_message(message + sizeof(uint16_t), size - sizeof(uint16_t));
+            response = handle_raft_message(msg);
             break;
         default:
-            p_logger->err(lstrfmt("Unexpected message type [%d]").fmt(type));
+            p_logger->err(lstrfmt("Unexpected message type [%d]").fmt(msg->header.m_type));
             return -1;
     }
-
 
     if (response) {
         p_logger->debug("ecall_handle_rpc_request: RESPONSE " + hex::encode(*response));
@@ -103,13 +100,20 @@ bool ecall_fetch_rpc_response(uint32_t msg_id, uint32_t buffer_size, uint8_t *bu
 
 ///////////////////////////////////////////////////////////////////////////////
 
+//ptr<bytes> handle_client_request(const erMessageMold *message);
+//
+//ptr<bytes> handle_system_request(const erMessageMold *message);
+//
+//ptr<bytes> handle_raft_message(const erMessageMold *message);
 
-ptr<bytes> handle_client_request(er_message_type type, const string &payload) {
+ptr<bytes> handle_client_request(const erMessageMold *message) {
+    const char *payload = reinterpret_cast<const char *>(message->payload);
+
     string json_err;
     Json body = Json::parse(payload, json_err);
 
     if (!json_err.empty()) {
-        p_logger->err(lstrfmt("JSON Parse Error: %s").fmt(payload.c_str()));
+        p_logger->err(lstrfmt("JSON Parse Error: %s").fmt(payload));
         p_logger->err(lstrfmt("JSON Parse Error: %s").fmt(json_err.c_str()));
     }
 
@@ -117,17 +121,17 @@ ptr<bytes> handle_client_request(er_message_type type, const string &payload) {
 
     bool result;
 
-    switch (type) {
+    switch (message->header.m_type) {
         case client_add_srv_req:
             *resp_type = client_add_srv_resp;
             {
                 int32_t server_id = body["server_id"].int_value();
                 string endpoint = body["endpoint"].string_value();
-//                auto srv_cfg = make_shared<srv_config>(server_id, endpoint);
 
                 p_logger->debug(lstrfmt("%s -> %s %d").fmt(__FUNCTION__, endpoint.c_str(), server_id));
 
-                key_store->build_key_xchg_req(server_id, endpoint);
+                // FIXME:
+//                key_store->build_key_xchg_req(server_id, endpoint);
 
                 result = true;
             }
@@ -150,10 +154,6 @@ ptr<bytes> handle_client_request(er_message_type type, const string &payload) {
                     bufptr p_log = buffer::alloc(s_log.size() + 8);
                     memset_s(p_log->data(), p_log->size(), 0, p_log->size());
                     memcpy_s(p_log->data(), p_log->size(), s_log.data(), s_log.length());
-
-//                    p_logger->warn("handle_client_request " + hex::encode(log));
-//                    p_logger->warn("handle_client_request " + s_log);
-//                    p_logger->warn("handle_client_request " + hex::encode(p_log->data(), p_log->size()));
 
                     logs.push_back(p_log);
                 }
@@ -180,7 +180,7 @@ ptr<bytes> handle_client_request(er_message_type type, const string &payload) {
     return resp_buf;
 }
 
-ptr<bytes> handle_system_request(er_message_type type, const string &payload) {
+ptr<bytes> handle_system_request(erMessageType type, const string &payload) {
     string json_err;
     Json body = Json::parse(payload, json_err);
 

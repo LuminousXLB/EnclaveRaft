@@ -27,7 +27,25 @@ set(T_COMMON_SRCS common/aes_ctr_crypto.cxx common/url_decode.cxx)
 set(U_COMMON_SRCS "")
 set(C_COMMON_SRCS common/aes_ctr_crypto.cxx)
 
+########################################################################################################################
+
+file(GLOB OD_ATTESTATION_TSRCS od_attestation/trusted/*.cxx)
+file(GLOB OD_ATTESTATION_USRCS od_attestation/untrusted/*.cxx)
+find_path(OD_ATTESTATION_EDL_PATH od_attestation.edl od_attestation)
+
+add_trusted_library(od_attestation_trusted
+        SRCS ${OD_ATTESTATION_TSRCS}
+        EDL od_attestation/od_attestation.edl
+        EDL_SEARCH_PATHS ${OD_ATTESTATION_EDL_PATH})
+target_include_directories(od_attestation_trusted PRIVATE ${SGXSSL_INCLUDE_DIR})
+
+add_untrusted_library(od_attestation_untrusted STATIC
+        SRCS ${OD_ATTESTATION_USRCS}
+        EDL od_attestation/od_attestation.edl
+        EDL_SEARCH_PATHS ${OD_ATTESTATION_EDL_PATH})
+
 #######################################################################################################################
+
 file(GLOB T_CORNERSTONE_SRCS raft_enclave/raft/src/*.cxx)
 file(GLOB T_RAFT_LOGSTORE_SRCS raft_enclave/app_impl/*.cxx)
 file(GLOB T_SGX_PORT_SRCS raft_enclave/port/*.cxx)
@@ -39,9 +57,10 @@ set(EDL_SEARCH_PATHS raft_enclave)
 add_enclave_library(Enclave_raft
         SRCS raft_enclave/raft_enclave.cpp ${T_COMMON_SRCS} ${T_CORNERSTONE_SRCS} ${T_SGX_PORT_SRCS} ${T_RAFT_LOGSTORE_SRCS} ${T_SGX_SYSTEM_SRCS} third_party/json11/json11.cpp
         EDL raft_enclave/raft_enclave.edl
-        EDL_SEARCH_PATHS raft_enclave)
+        EDL_SEARCH_PATHS raft_enclave ${OD_ATTESTATION_EDL_PATH})
 target_include_directories(Enclave_raft PRIVATE ${SGXSSL_INCLUDE_DIR})
-#target_link_libraries(Enclave_raft json11)
+target_include_directories(Enclave_raft PRIVATE od_attestation/trusted)
+target_link_libraries(Enclave_raft od_attestation_trusted)
 #include_directories(raft_enclave)
 
 # sign the enclave, according to configurations one-step or two-step signing will be performed.
@@ -52,16 +71,17 @@ enclave_sign(Enclave_raft
 
 #######################################################################################################################
 
-file(GLOB U_SGX_PORT_SRCS raft_app/port/*.cxx)
+file(GLOB U_SGX_PORT_SRCS raft_app/port/*.cxx raft_app/ias_request/ias_request.cxx)
 file(GLOB U_SGX_SYSTEM_SRCS raft_app/system/*.cxx)
 
 # build untrusted executable to run with enclave
 add_untrusted_executable(App_raft
         SRCS raft_app/raft_app.cpp ${U_COMMON_SRCS} ${U_SGX_PORT_SRCS} ${U_SGX_SYSTEM_SRCS}
         EDL raft_enclave/raft_enclave.edl
-        EDL_SEARCH_PATHS raft_enclave)
+        EDL_SEARCH_PATHS raft_enclave ${OD_ATTESTATION_EDL_PATH})
 
 target_link_libraries(App_raft sgx_utils spdlog::spdlog OpenSSL::SSL json11)
+target_link_libraries(App_raft od_attestation_untrusted)
 target_include_directories(App_raft PRIVATE third_party/spdlog-1.4.2/include)
 target_include_directories(App_raft PRIVATE third_party/asio-1.12.2/include)
 

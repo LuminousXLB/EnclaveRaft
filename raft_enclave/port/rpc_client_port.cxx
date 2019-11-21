@@ -5,7 +5,6 @@
 #include <tlibc/mbusafecrt.h>
 #include "rpc_client_port.hxx"
 #include "messages.hxx"
-#include "../system/key_store.hxx"
 
 using cornerstone::rpc_exception;
 using cornerstone::cs_new;
@@ -13,11 +12,9 @@ using cornerstone::resp_msg;
 using cornerstone::msg_type;
 
 map<uint64_t, raft_callback_item> raft_rpc_client_callback_pool;
-//map<uint64_t, system_callback_item> system_rpc_client_callback_pool;
 
 mutex rpc_client_callback_pool_lock;
 atomic<uint32_t> last_req_uid_;
-extern ptr<er_key_store> key_store;
 
 
 static void handle_system_resp(er_message_type type, uint32_t req_uid, const uint8_t *data, uint32_t size);

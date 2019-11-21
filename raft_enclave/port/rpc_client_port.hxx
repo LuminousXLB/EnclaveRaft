@@ -103,7 +103,7 @@ public:
         raw_send(system_key_exchange_req, buffer, uid);
     }
 
-    void raw_send(er_message_type type, const ptr<bytes> &message, uint32_t unique_id) {
+    void raw_send(erMessageType type, const ptr<bytes> &message, uint32_t unique_id) {
         auto *ptr = reinterpret_cast<uint8_t *>(&type);
         message->insert(message->begin(), ptr, ptr + sizeof(uint16_t));
         ocall_send_rpc_request(client_uid_, message->size(), message->data(), unique_id);

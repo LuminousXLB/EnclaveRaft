@@ -100,48 +100,38 @@ private:
         global_logger->trace("socket session {}: {}", session_id_, __FUNCTION__);
 
         auto self = shared_from_this();
-        asio::async_read(socket_, request_, asio::transfer_at_least(request_header_size - request_.size()),
-                         [self](const asio::error_code &error, size_t bytes_read) {
-                             if (!error) {
-                                 self->handle_request_header();
-                             } else {
-                                 self->handle_error("read header", error);
-                             }
-                         });
-    }
-
-    void handle_request_header() {
-        global_logger->trace("socket session {}: {}", session_id_, __FUNCTION__);
-
-        std::istream in(&request_);
-        in.read(reinterpret_cast<char *>(&payload_size_), sizeof(uint32_t));
-
-        if (request_.size() < payload_size_) {
-            read_payload();
-        } else {
-            handle_request();
-        }
+        asio::async_read_until(socket_, request_,
+                               asio::transfer_at_least(request_header_size - request_.size()),
+                               [self](const asio::error_code &error, size_t bytes_read) {
+                                   if (!error) {
+                                       self->read_payload();
+                                   } else {
+                                       self->handle_error("read header", error);
+                                   }
+                               });
     }
 
     void read_payload() {
         global_logger->trace("socket session {}: {} payload_size={}, read={}", session_id_, __FUNCTION__, payload_size_,
                              request_.size());
 
-        auto self = shared_from_this();
-        asio::async_read(socket_, request_, asio::transfer_at_least(1),
-                         [self](const asio::error_code &error, size_t bytes_read) {
-                             if (!error) {
-                                 if (self->request_.size() < self->payload_size_) {
-                                     self->read_payload();
-                                 } else {
-                                     self->handle_request();
-                                 }
-                             } else {
-                                 self->handle_error("read payload", error);
-                             }
-                         });
-    }
 
+        const uint32_t *msg_size = static_cast<const uint32_t *>(request_.data().data());
+        if (request_.size() < *msg_size) {
+            auto self = shared_from_this();
+            asio::async_read_until(socket_, request_,
+                                   asio::transfer_at_least(1),
+                                   [self](const std::error_code &error, size_t bytes_transferred) {
+                                       if (!error || error == asio::error::eof) {
+                                           self->read_payload();
+                                       } else {
+                                           self->handle_error("read payload", error);
+                                       }
+                                   });
+        } else {
+            handle_request();
+        }
+    }
 
     void handle_request() {
         global_logger->trace("socket session {}: {}", session_id_, __FUNCTION__);
@@ -174,21 +164,14 @@ private:
         global_logger->trace("socket session {}: {} payload_size={}, payload={}", session_id_, __FUNCTION__,
                              resp_buf->size(), spdlog::to_hex(*resp_buf));
 
-        payload_size_ = resp_buf->size();
-
-        std::ostream out(&response_);
-        out.write(reinterpret_cast<const char *>(&payload_size_), sizeof(uint32_t));
-        out.write(reinterpret_cast<const char *>(resp_buf->data()), payload_size_);
-
         auto self = shared_from_this();
-        asio::async_write(socket_, response_, asio::transfer_all(),
+        asio::async_write(socket_, asio::buffer(*resp_buf),
                           [self](const asio::error_code &error, size_t bytes_written) {
                               if (!error) {
                                   self->payload_size_ = 0;
-                                  self->response_.consume(self->response_.size());
 
                                   if (self->request_.size() >= request_header_size) {
-                                      self->handle_request_header();
+                                      self->read_payload();
                                   } else {
                                       self->start();
                                   }
@@ -204,7 +187,6 @@ private:
     asio::ip::tcp::socket socket_;
     uint32_t payload_size_;
     asio::streambuf request_;
-    asio::streambuf response_;
 
     request_handler handler_;
     session_closed_callback callback_;

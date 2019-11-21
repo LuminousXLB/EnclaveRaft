@@ -4,6 +4,7 @@
 
 #include "cert_utils.hxx"
 #include <functional>
+#include <vector>
 
 #include <openssl/pem.h>
 #include <openssl/err.h>
@@ -11,14 +12,19 @@
 
 typedef STACK_OF(X509) sk_X509;
 
+using std::string;
+template<class T>
+using sptr =std::shared_ptr<T>;
+using bytes = std::vector<uint8_t>;
+
 /*==========================================================================
  * Load Certificates
  *========================================================================== */
 
 X509 *load_cert_unsafe(const char *data, size_t size) {
-    ptr<BIO> bio_mem = ptr<BIO>(BIO_new(BIO_s_mem()), BIO_free);
+    auto bio_mem = sptr<BIO>(BIO_new(BIO_s_mem()), BIO_free);
 
-    if (bio_mem == nullptr || bio_mem.get() == nullptr) {
+    if (bio_mem == nullptr) {
         throw OpenSSLException(ERR_get_error());
     }
 
@@ -35,10 +41,10 @@ X509 *load_cert_unsafe(const char *data, size_t size) {
 }
 
 
-ptr<sk_X509> load_cert_chain(const string &cert_chain, ptr<X509> &sign_cert) {
-    /* ret */ ptr<sk_X509> stack = ptr<sk_X509>(sk_X509_new_null(),
-                                                std::bind(sk_X509_pop_free, std::placeholders::_1, X509_free));
-    if (stack == nullptr || stack.get() == nullptr) {
+sptr<sk_X509> load_cert_chain(const string &cert_chain, sptr<X509> &sign_cert) {
+    /* ret */ auto stack = sptr<sk_X509>(sk_X509_new_null(),
+                                         std::bind(sk_X509_pop_free, std::placeholders::_1, X509_free));
+    if (stack == nullptr) {
         throw OpenSSLException(ERR_get_error());
     }
 
@@ -52,7 +58,7 @@ ptr<sk_X509> load_cert_chain(const string &cert_chain, ptr<X509> &sign_cert) {
         sk_X509_push(stack.get(), cert);
 
         if (idx_l == 0) {
-            sign_cert = ptr<X509>(cert, X509_free);
+            sign_cert = sptr<X509>(cert, X509_free);
         }
 
         idx_l = idx_r;
@@ -65,9 +71,9 @@ ptr<sk_X509> load_cert_chain(const string &cert_chain, ptr<X509> &sign_cert) {
  * Certificate verification
  *========================================================================== */
 
-ptr<X509_STORE> build_ca(X509 *cert) {
-    /* ret */ ptr<X509_STORE> store = ptr<X509_STORE>(X509_STORE_new(), X509_STORE_free);
-    if (store == nullptr || store.get() == nullptr) {
+sptr<X509_STORE> build_ca(X509 *cert) {
+    /* ret */ auto store = sptr<X509_STORE>(X509_STORE_new(), X509_STORE_free);
+    if (store == nullptr) {
         throw OpenSSLException(ERR_get_error());
     }
 
@@ -86,8 +92,8 @@ ptr<X509_STORE> build_ca(X509 *cert) {
  */
 
 bool cert_verify(X509_STORE *store, sk_X509 *chain) {
-    ptr<X509_STORE_CTX> ctx = ptr<X509_STORE_CTX>(X509_STORE_CTX_new(), X509_STORE_CTX_free);
-    if (ctx == nullptr || ctx.get() == nullptr) {
+    auto ctx = sptr<X509_STORE_CTX>(X509_STORE_CTX_new(), X509_STORE_CTX_free);
+    if (ctx == nullptr) {
         throw OpenSSLException(ERR_get_error());
     }
 
@@ -104,8 +110,8 @@ bool cert_verify(X509_STORE *store, sk_X509 *chain) {
 }
 
 bool sha256_verify(const uint8_t *msg, size_t msgsz, const uint8_t *sig, size_t sigsz, EVP_PKEY *pkey) {
-    ptr<EVP_MD_CTX> ctx = ptr<EVP_MD_CTX>(EVP_MD_CTX_new(), EVP_MD_CTX_free);
-    if (ctx == nullptr || ctx.get() == nullptr) {
+    auto ctx = sptr<EVP_MD_CTX>(EVP_MD_CTX_new(), EVP_MD_CTX_free);
+    if (ctx == nullptr) {
         throw OpenSSLException(ERR_get_error());
     }
 
@@ -181,14 +187,14 @@ bool verify_certs_and_signature(const string &certs, const bytes &sig, const uin
     }
 
     /* Load Intel Root CA */
-    ptr<X509> root_ca = ptr<X509>(load_cert_unsafe(ias_root_ca_cert.c_str(), ias_root_ca_cert.size()), X509_free);
+    auto root_ca = sptr<X509>(load_cert_unsafe(ias_root_ca_cert.c_str(), ias_root_ca_cert.size()), X509_free);
 
     /* Build certificate stack from the certificate chain string */
-    ptr<X509> sign_cert;
-    ptr<sk_X509> stack = load_cert_chain(certs, sign_cert);
+    sptr<X509> sign_cert;
+    sptr<sk_X509> stack = load_cert_chain(certs, sign_cert);
 
     /* Verify the certificate */
-    ptr<X509_STORE> store = build_ca(root_ca.get());
+    sptr<X509_STORE> store = build_ca(root_ca.get());
     if (!cert_verify(store.get(), stack.get())) {
         return false;
     }
@@ -199,7 +205,7 @@ bool verify_certs_and_signature(const string &certs, const bytes &sig, const uin
      * signing cert.  Extract the public key from the certificate and
      * verify the signature.
      */
-    ptr<EVP_PKEY> pkey = ptr<EVP_PKEY>(X509_get_pubkey(sign_cert.get()), EVP_PKEY_free);
+    sptr<EVP_PKEY> pkey = sptr<EVP_PKEY>(X509_get_pubkey(sign_cert.get()), EVP_PKEY_free);
     if (pkey == nullptr || pkey.get() == nullptr) {
         throw OpenSSLException(ERR_get_error());
     }

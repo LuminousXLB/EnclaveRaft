@@ -8,7 +8,6 @@
 #include <regex>
 #include <iostream>
 #include <string>
-#include <spdlog/logger.h>
 #include "asio.hpp"
 #include "asio/ssl.hpp"
 
@@ -18,8 +17,6 @@ using std::map;
 using std::cerr;
 using std::endl;
 using std::shared_ptr;
-
-extern shared_ptr<spdlog::logger> global_logger;
 
 
 class ssl_client {
@@ -69,7 +66,6 @@ private:
 
     void handle_error(const string &description) {
         if (error_) {
-            global_logger->critical("IAS {} failed: {}", description, error_.message());
             throw asio::system_error(error_);
         }
     }
@@ -119,27 +115,5 @@ protected:
     asio::streambuf response_;
     size_t size_;
 };
-//
-//int main(int argc, char *argv[]) {
-//    try {
-//        asio::io_context io_context;
-//
-//        tcp_resolver resolver(io_context);
-//        tcp_resolver::results_type endpoints = resolver.resolve(host, protocol);
-//
-//        asio::ssl::context ctx(asio::ssl::context::sslv23);
-//        ctx.load_verify_file("/etc/ssl/certs/ca-certificates.crt");
-//
-//        client c(io_context, ctx, endpoints);
-//
-//        io_context.run();
-//    }
-//    catch (std::exception &e) {
-//        std::cerr << "Exception @ <" << __LINE__ << ">: " << e.what() << "\n";
-//    }
-//
-//    return 0;
-//}
-//
 
 #endif //ENCLAVERAFT_SSLCLIENT_HXX

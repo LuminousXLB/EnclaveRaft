@@ -25,6 +25,11 @@ class LoggerPort : public cornerstone::logger {
     }
 
 public:
+
+    void trace(const string &log_line) {
+        log(LOG_LEVEL_TRACE, log_line);
+    }
+
     void debug(const string &log_line) override {
         log(LOG_LEVEL_DEBUG, log_line);
     }
@@ -39,6 +44,10 @@ public:
 
     void err(const string &log_line) override {
         log(LOG_LEVEL_ERROR, log_line);
+    }
+
+    void critical(const string &log_line) {
+        log(LOG_LEVEL_CRITICAL, log_line);
     }
 };
 
