@@ -38,17 +38,19 @@ public:
             : io_context_ptr_(std::move(io_context_ptr)), port_(port) {}
 
     ptr<SocketClient> get_client() {
-        for (auto it = pool_.begin(); it != pool_.end(); it++) {
-            if ((*it)->status() == SocketClient::AVAILABLE) {
-                return (*it);
-            } else if ((*it)->status() == SocketClient::ERROR) {
-                pool_.erase(it);
-            }
-        }
+//        for (auto it = pool_.begin(); it != pool_.end(); it++) {
+//            if ((*it)->status() == SocketClient::AVAILABLE) {
+//                return (*it);
+//            } else if ((*it)->status() == SocketClient::ERROR) {
+//                pool_.erase(it);
+//                it = pool_.begin();
+//            }
+//        }
+//
+//        pool_.emplace_back(std::make_shared<SocketClient>(io_context_ptr_, port_));
 
-        pool_.emplace_back(std::make_shared<SocketClient>(io_context_ptr_, port_));
-
-        return pool_.back();
+//        return pool_.back();
+        return std::make_shared<SocketClient>(io_context_ptr_, port_);
     }
 
 private:
@@ -110,40 +112,40 @@ int main(int argc, const char *argv[]) {
             auto client = std::make_shared<SocketClient>(io_context_ptr, 9000 + leader_id);
             logger->info("\tadding server {}", i);
             client->send(request);
-            std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(500));
-            return 0;
+            std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(200));
         }
     }
 
-    std::thread tt([&interval, &leader_id, payload_size]() {
-        ClientPool pool(io_context_ptr, 9000 + leader_id);
+    ClientPool pool(io_context_ptr, 9000 + leader_id);
 
-        while (true) {
-            try {
-                string dummy = generate_dummy_string(payload_size);
-                auto request = RequestBuilder::append_entries(dummy);
+    while (true) {
+        try {
+            string dummy = generate_dummy_string(payload_size);
+            auto request = RequestBuilder::append_entries(dummy);
 
-                string msg = dummy;
-                if (msg.length() > 64) {
-                    msg.resize(64);
-                }
-
-                auto client = pool.get_client();
-                logger->info("sending request {}", msg);
-                client->send(request);
-
-            } catch (std::runtime_error &err) {
-                interval *= 2;
-                logger->error(err.what());
+            string msg = dummy;
+            if (msg.length() > 64) {
+                msg.resize(64);
             }
 
-            if (interval >= 1) {
-                std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(interval));
-            }
+            auto client = pool.get_client();
+            logger->info("sending request {}", msg);
+            client->send(request);
+
+        } catch (std::runtime_error &err) {
+            interval *= 2;
+            logger->error(err.what());
         }
-    });
 
-    tt.detach();
+        if (interval >= 1) {
+            std::this_thread::sleep_for(std::chrono::duration<uint32_t, std::milli>(interval));
+        }
+    }
+//    std::thread tt([&interval, &leader_id, payload_size]() {
+//
+//    });
+
+//    tt.detach();
 
 #endif
 

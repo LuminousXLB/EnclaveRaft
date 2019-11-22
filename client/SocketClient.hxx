@@ -87,7 +87,7 @@ public :
             });
         } catch (std::system_error &err) {
             logger->critical("SYSTEM ERROR HERE {}{}", __LINE__, err.what());
-            throw;
+//            throw;
         }
     }
 
