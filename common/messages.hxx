@@ -7,13 +7,9 @@
 
 #include "common.hxx"
 
-static constexpr uint32_t er_length_field = sizeof(uint32_t);
-static constexpr uint32_t er_type_field = sizeof(uint16_t);
+static constexpr uint32_t er_length_field_size = sizeof(uint32_t);
+static constexpr uint32_t er_type_field_size = sizeof(uint16_t);
 
-
-//ptr<async_result<bool>> add_srv(const srv_config &srv);
-//ptr<async_result<bool>> remove_srv(const int srv_id);
-//ptr<async_result<bool>> append_entries(std::vector<bufptr> &logs);
 
 enum erMessageType {
     client_add_srv_req = 1,

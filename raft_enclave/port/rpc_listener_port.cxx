@@ -100,12 +100,6 @@ bool ecall_fetch_rpc_response(uint32_t msg_id, uint32_t buffer_size, uint8_t *bu
 
 ///////////////////////////////////////////////////////////////////////////////
 
-//ptr<bytes> handle_client_request(const erMessageMold *message);
-//
-//ptr<bytes> handle_system_request(const erMessageMold *message);
-//
-//ptr<bytes> handle_raft_message(const erMessageMold *message);
-
 ptr<bytes> handle_client_request(const erMessageMold *message) {
     const char *payload = reinterpret_cast<const char *>(message->payload);
 
@@ -131,6 +125,16 @@ ptr<bytes> handle_client_request(const erMessageMold *message) {
                 p_logger->debug(lstrfmt("%s -> %s %d").fmt(__FUNCTION__, endpoint.c_str(), server_id));
 
                 // FIXME:
+
+                Json payload = Json{
+                        {"server_id",           1 /*the id of this server*/},
+                        {"verification_report", g.keystore->report()}
+                };
+
+                erMessage<std::string> msg(std::make_shared<std::string>(payload.dump()), system_key_exchange_req);
+
+
+//                g.keystore
 //                key_store->build_key_xchg_req(server_id, endpoint);
 
                 result = true;
@@ -179,6 +183,10 @@ ptr<bytes> handle_client_request(const erMessageMold *message) {
 
     return resp_buf;
 }
+
+//ptr<bytes> handle_system_request(const erMessageMold *message);
+//
+//ptr<bytes> handle_raft_message(const erMessageMold *message);
 
 ptr<bytes> handle_system_request(erMessageType type, const string &payload) {
     string json_err;

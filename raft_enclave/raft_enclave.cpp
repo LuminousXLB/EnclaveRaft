@@ -30,7 +30,7 @@ using json11::Json;
 
 app_context_t g;
 
-void run_raft_instance(app_context_t &context, int srv_id, const char *address, uint16_t port) {
+void run_raft_instance(app_context_t &a_ctx, int srv_id, const char *address, uint16_t port) {
     string endpoint = sstrfmt("tcp://%s:%d").fmt(address, port);
 
     ptr<logger> p_logger = make_shared<LoggerPort>();
@@ -63,9 +63,9 @@ void run_raft_instance(app_context_t &context, int srv_id, const char *address, 
 
     p_listener->listen(p_server);
 
-    context.log = p_logger;
-    context.listener = p_listener;
-    context.server = p_server;
+    a_ctx.log = p_logger;
+    a_ctx.listener = p_listener;
+    a_ctx.server = p_server;
 }
 
 void ecall_init_application(int srv_id, uint16_t port, const sgx_spid_t *spid, sgx_quote_sign_type_t type) {

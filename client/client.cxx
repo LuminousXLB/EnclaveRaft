@@ -91,7 +91,7 @@ int main(int argc, const char *argv[]) {
 
     int32_t leader_id = 1;
 
-#if 0
+#if 1
 
     string dummy = generate_dummy_string(256);
     auto request = RequestBuilder::append_entries(dummy);
