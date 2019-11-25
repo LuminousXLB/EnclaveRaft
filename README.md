@@ -1,9 +1,7 @@
 # EnclaveRaft
 Implement Raft in an Enclave
 
-## How to run
-
-### Prerequisites
+## Prerequisites
 
 - SGX-SDK
 <https://github.com/intel/linux-sgx/>
@@ -20,7 +18,7 @@ If the sgx-sdk is not installed in  `/opt/intel/sgxssl`, specify the path using
 set(SGXSSL_SDK <sgxssl-path>)
 ```
 
-### Build
+## Build & Run
 
 ```console
 $ mkdir build
@@ -29,15 +27,16 @@ $ cmake ..
 $ make
 ```
 
-#### Server
+#### Run the Server
 
 ```console
 $ ./App_raft <server-id>
 ```
 
-#### Client
+#### Run the Client
 
 ```console
 $ ./client <client-id> <request interval (ms)> <payload size (bytes)>
 ```
 
+Note: The default client routine in `client/client.cxx` assumes that there have been 5 servers with ID 1-5 running.
