@@ -3,7 +3,23 @@ Implement Raft in an Enclave
 
 ## Prerequisites
 
-- SGX-SDK
+- EPID
+
+Head to  https://api.portal.trustedservices.intel.com/EPID-attestation to apply for an SGX Attestation Service subscription.
+
+Create `EnclaveRaft\common\secret.h`
+
+```cpp
+#pragma once
+
+#define intel_api_primary "{{ Primary key }}"
+#define intel_api_secondary "{{ Secondary key }}"
+#define intel_api_spid "{{ SPID }}"
+
+```
+
+
+- SGX-SDK 2.9.1
 <https://github.com/intel/linux-sgx/>
 - SGX-SSL
 <https://github.com/intel/intel-sgx-ssl>

@@ -188,11 +188,11 @@ private:
 private:
     tcp_resolver resolver_;
     asio::ip::tcp::socket socket_;
-    std::string host_;
-    std::string port_;
+    string host_;
+    string port_;
     uint32_t client_uid_;
-    std::map<uint32_t, ptr<bytes>> req_map_;
-    std::map<uint32_t, ptr<bytes>> resp_map_;
+    map<uint32_t, ptr<bytes>> req_map_;
+    map<uint32_t, ptr<bytes>> resp_map_;
 };
 
 

@@ -8,7 +8,9 @@
 #include <iostream>
 #include <thread>
 #include "cppcodec/hex_default_lower.hpp"
-#include "sgx_uae_service.h"
+#include "sgx_uae_launch.h"
+#include "sgx_uae_epid.h"
+#include "sgx_uae_quote_ex.h"
 #include "sgx_exception.hpp"
 #include "secret.h"
 #include "raft_enclave_u.h"

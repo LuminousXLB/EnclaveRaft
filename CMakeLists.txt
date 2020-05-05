@@ -11,6 +11,9 @@ include_directories(${SGX_INCLUDE_DIR})
 
 ##### third_pary ######################################################################################################
 
+add_definitions(-DASIO_STANDALONE)
+set(BUILD_TESTING OFF)
+
 add_subdirectory(third_party/spdlog-1.4.2)
 add_subdirectory(third_party/cppcodec-0.2)
 include_directories(third_party/cppcodec-0.2)

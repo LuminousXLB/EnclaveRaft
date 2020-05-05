@@ -10,10 +10,12 @@
 #include <array>
 #include <string>
 #include <memory>
+#include <map>
 
 using std::vector;
 using std::array;
 using std::string;
+using std::map;
 using std::make_shared;
 
 static constexpr unsigned int S_KEY_SIZE = 32;
